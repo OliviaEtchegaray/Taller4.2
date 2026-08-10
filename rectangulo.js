@@ -75,7 +75,6 @@ function startBlue1(){
 }
 
 
-
 // 2
 function startBlue2(){
     let square = { x: mainCanvas.width/2, y: mainCanvas.height/2, size: 80, scale: 1 };
@@ -106,7 +105,6 @@ function startBlue2(){
         let tx = (clientX - rect.left) * (mainCanvas.width / rect.width);
         let ty = (clientY - rect.top) * (mainCanvas.height / rect.height);
 
-      
         if (Math.abs(tx - square.x) < square.size && Math.abs(ty - square.y) < square.size) {
             spawnMinis();
         }
@@ -120,11 +118,12 @@ function startBlue2(){
         mainCtx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
 
         if (!hasTouched) {
-            pulse += 0.05;
-            square.scale = 1 + Math.sin(pulse) * 0.15;
+            // Aumentamos la velocidad de 0.05 a 0.18
+            pulse += 0.18;
+            // Aumentamos el tamaño de la expansión de 0.15 a 0.35
+            square.scale = 1 + Math.sin(pulse) * 0.35;
         }
 
-     
         minis.forEach(m => {
             m.x += m.vx;
             m.y += m.vy;
@@ -138,13 +137,11 @@ function startBlue2(){
         
         minis = minis.filter(m => m.alpha > 0);
 
-    
         let currentSize = square.size * square.scale;
         drawGradientSquare(mainCtx, square.x, square.y, currentSize, 1);
     }
     animate();
 }
-
 
 //  3
 
