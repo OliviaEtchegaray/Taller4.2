@@ -1,14 +1,32 @@
-
 // 1
-
 function startTriangulo1() {
-    let cx = mainCanvas.width / 2 + 20;
+    let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
-    let opacity = 0.2;
+    
+    // Lógica de fondos
+    const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
+    let currentBg = -1;
 
-    // Pedir permisos obligatorios en iOS 13+
+    // Posiciones lado a lado e independencia (diferentes multiplicadores de reacción)
+    let triangles = [
+        { offsetX: -80, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.5 },
+        { offsetX: 0, offsetY: 0, opacity: 0.2, flashed: false, rate: 0.8 },
+        { offsetX: 80, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.2 }
+    ];
+
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
         DeviceMotionEvent.requestPermission().catch(console.error);
+    }
+
+    function triggerFlash(t) {
+        t.flashed = true;
+        t.opacity = 1;
+        currentBg = (currentBg + 1) % bgColors.length; // Cambio de fondo global
+        
+        setTimeout(() => {
+            t.opacity = 0.2;
+            t.flashed = false;
+        }, 500);
     }
 
     function handleMotion(event) {
@@ -17,15 +35,22 @@ function startTriangulo1() {
         
         let force = Math.abs(acc.x||0) + Math.abs(acc.y||0) + Math.abs(acc.z||0);
         if (force > 15) { 
-            opacity += 0.15;
-            if (opacity >= 1) setTimeout(() => opacity = 0.2, 500); 
+            triangles.forEach(t => {
+                if (!t.flashed) {
+                    t.opacity += 0.15 * t.rate; // Reacción independiente
+                    if (t.opacity >= 1) triggerFlash(t);
+                }
+            });
         }
     }
 
-    // Fallback por si lo usan deslizando el dedo o ratón
     function handleManualSwipe() {
-        opacity += 0.1;
-        if (opacity >= 1) setTimeout(() => opacity = 0.2, 500);
+        triangles.forEach(t => {
+            if (!t.flashed) {
+                t.opacity += 0.1 * t.rate;
+                if (t.opacity >= 1) triggerFlash(t);
+            }
+        });
     }
 
     window.addEventListener('devicemotion', handleMotion, true);
@@ -40,40 +65,59 @@ function startTriangulo1() {
 
     function animate() {
         animation = requestAnimationFrame(animate);
-        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
         
-        if(opacity > 0.2) opacity -= 0.005;
-
-   
-        drawGradientTriangle(mainCtx, cx, cy, 70, 150, 255, 150, opacity);
+        // Dibujado del fondo
+        if(currentBg !== -1) {
+            drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
+        } else {
+            mainCtx.fillStyle = "#ffffff";
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+        }
+        
+        // Dibujar los 3 triángulos verdes independientes
+        triangles.forEach(t => {
+            if(t.opacity > 0.2 && !t.flashed) t.opacity -= 0.005;
+            // RGB verde estandarizado
+            drawGradientTriangle(mainCtx, cx + t.offsetX, cy + t.offsetY, 50, 50, 205, 50, t.opacity);
+        });
     }
     animate();
 }
 
-//  2
-
+// 2
 function startTriangulo2() {
-    let cx = mainCanvas.width / 2 + 20;
+    let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
-    let triX = cx, triY = cy;
-    let sensitivity = 1, fails = 0;
-    let bgColors = ["#ffffff", "#e6ffe6", "#ccffcc", "#99ff99"]; // Fondos verdosos
+    let sensitivity = 1.5; 
+    
+    // Lógica de fondos
+    const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
+    let currentBg = -1;
 
-    // Pedir permisos en iOS 13+
+    // Posiciones lado a lado e independencia rítmica
+    let triangles = [
+        { x: cx - 80, y: cy, baseX: cx - 80, baseY: cy, mult: 1.4, fadeOut: 0, resetting: false },
+        { x: cx, y: cy, baseX: cx, baseY: cy, mult: 0.7, fadeOut: 0, resetting: false },
+        { x: cx + 80, y: cy, baseX: cx + 80, baseY: cy, mult: 1.1, fadeOut: 0, resetting: false }
+    ];
+
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission().catch(console.error);
     }
 
-    let difficultyInterval = setInterval(() => sensitivity += 0.5, 10000);
+    let difficultyInterval = setInterval(() => sensitivity += 0.8, 10000);
 
     function handleOrientation(event) {
         if (!event.beta || !event.gamma) return;
-        triX += event.gamma * sensitivity * 0.2;
-        triY += event.beta * sensitivity * 0.2;
-        checkFail();
+        triangles.forEach(t => {
+            if (t.resetting) return;
+            // Movimiento afectado por el multiplicador individual
+            t.x += event.gamma * sensitivity * 0.4 * t.mult;
+            t.y += event.beta * sensitivity * 0.4 * t.mult;
+            checkFail(t);
+        });
     }
 
-    // Fallback simulado para PC arrastrando (simulando desbalance)
     function handleManualDrag(e) {
         const rect = mainCanvas.getBoundingClientRect();
         let clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -81,17 +125,18 @@ function startTriangulo2() {
         let tx = (clientX - rect.left) * (mainCanvas.width / rect.width);
         let ty = (clientY - rect.top) * (mainCanvas.height / rect.height);
         
-       
-        triX += (tx - cx) * 0.05 * sensitivity;
-        triY += (ty - cy) * 0.05 * sensitivity;
-        checkFail();
+        triangles.forEach(t => {
+            if (t.resetting) return;
+            t.x += (tx - cx) * 0.1 * sensitivity * t.mult;
+            t.y += (ty - cy) * 0.1 * sensitivity * t.mult;
+            checkFail(t);
+        });
     }
 
-    function checkFail() {
-        if (Math.hypot(triX - cx, triY - cy) > mainCanvas.height * 0.4) {
-            fails++;
-            triX = cx; triY = cy;
-            sensitivity = 1;
+    function checkFail(t) {
+        if (Math.hypot(t.x - t.baseX, t.y - t.baseY) > mainCanvas.height * 0.35) {
+            t.resetting = true;
+            currentBg = (currentBg + 1) % bgColors.length; // Flash/Fondo cuando uno pierde el control
         }
     }
 
@@ -108,29 +153,60 @@ function startTriangulo2() {
 
     function animate() {
         animation = requestAnimationFrame(animate);
-        mainCtx.fillStyle = bgColors[Math.min(fails, bgColors.length - 1)];
-        mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+        
+        if(currentBg !== -1) {
+            drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
+        } else {
+            mainCtx.fillStyle = "#ffffff"; 
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+        }
 
-        triX += (cx - triX) * 0.02; // Retorno elástico
-        triY += (cy - triY) * 0.02;
+        triangles.forEach(t => {
+            if (t.resetting) {
+                t.fadeOut += 0.03;
+                if (t.fadeOut >= 1) {
+                    t.x = t.baseX; 
+                    t.y = t.baseY;
+                    t.fadeOut = 0;
+                    t.resetting = false;
+                }
+            }
+            
+            let currentOpacity = Math.max(0, 1 - t.fadeOut);
 
-        drawGradientTriangle(mainCtx, triX, triY, 70, 150, 255, 150, 1);
+            if (!t.resetting) {
+                t.x += (t.baseX - t.x) * 0.01; 
+                t.y += (t.baseY - t.y) * 0.01;
+            }
+
+            // Mismo verde y tamaño
+            drawGradientTriangle(mainCtx, t.x, t.y, 50, 50, 205, 50, currentOpacity);
+        });
     }
     animate();
 }
 
+// 3
 function startTriangulo3() {
-
     let gravityX = 0;
     let gravityY = 0;
     let successCount = 0;
     let gameOverTimeout = null;
+    let difficultyMultiplier = 1; 
 
+    // Lógica de fondos
+    const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
+    let currentBg = -1;
 
+    let difficultyInterval = setInterval(() => {
+        difficultyMultiplier += 0.3;
+    }, 5000);
+
+    // Huecos dispersos. Eliminé los ángulos, ahora son rectos e idénticos a los T1 y T2
     let targets = [
-        { x: mainCanvas.width * 0.25, y: mainCanvas.height * 0.3, size: 60, angle: 0, matched: false, glow: 0 },
-        { x: mainCanvas.width * 0.75, y: mainCanvas.height * 0.4, size: 60, angle: Math.PI * 2 / 3, matched: false, glow: 0 },
-        { x: mainCanvas.width * 0.5,  y: mainCanvas.height * 0.7, size: 60, angle: Math.PI * 4 / 3, matched: false, glow: 0 }
+        { x: mainCanvas.width * 0.3, y: mainCanvas.height * 0.3, size: 50, matched: false, glow: 0 },
+        { x: mainCanvas.width * 0.7, y: mainCanvas.height * 0.4, size: 50, matched: false, glow: 0 },
+        { x: mainCanvas.width * 0.5, y: mainCanvas.height * 0.7, size: 50, matched: false, glow: 0 }
     ];
 
     let pieces = targets.map((t, index) => ({
@@ -138,45 +214,38 @@ function startTriangulo3() {
         y: Math.random() * (mainCanvas.height - 100) + 50,
         vx: 0,
         vy: 0,
-        size: 58, 
-        angle: t.angle, 
+        size: 50, 
         targetIndex: index
     }));
 
-   
     function handleOrientation(event) {
-   
         gravityX = event.gamma * 0.15; 
         gravityY = event.beta * 0.15;
     }
     
     window.addEventListener('deviceorientation', handleOrientation);
 
-  
     let keys = {};
     window.onkeydown = (e) => keys[e.key] = true;
     window.onkeyup = (e) => keys[e.key] = false;
 
-    function drawTriangle(ctx, x, y, size, angle, color) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.beginPath();
-    
-        ctx.moveTo(0, -size / Math.sqrt(3));
-        ctx.lineTo(-size / 2, size / (2 * Math.sqrt(3)));
-        ctx.lineTo(size / 2, size / (2 * Math.sqrt(3)));
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.restore();
-    }
+    let oldStop = stopCurrentAnimation;
+    stopCurrentAnimation = function() {
+        window.removeEventListener('deviceorientation', handleOrientation);
+        clearInterval(difficultyInterval);
+        oldStop();
+    };
 
     function animate() {
         animation = requestAnimationFrame(animate);
-        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        
+        if(currentBg !== -1) {
+            drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
+        } else {
+            mainCtx.fillStyle = "#ffffff";
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+        }
 
-        // Fallback de teclado si no hay acelerómetro activo
         if (keys["ArrowLeft"]) gravityX = -5;
         if (keys["ArrowRight"]) gravityX = 5;
         if (keys["ArrowUp"]) gravityY = -5;
@@ -185,71 +254,58 @@ function startTriangulo3() {
             gravityX = 0; gravityY = 0;
         }
 
-        // 1. Dibujar Huecos Grises (Targets)
+        // 1. Dibujar Huecos Grises DIRECTAMENTE
         targets.forEach(t => {
-            let color = `rgb(${100 + t.glow * 155}, ${100 + t.glow * 155}, ${100 + t.glow * 155})`;
-            drawTriangle(mainCtx, t.x, t.y, t.size, t.angle, t.matched ? color : "#555555");
-            
-            // Reducir el brillo paulatinamente si ya se iluminó
+            let intensity = t.matched ? (100 + t.glow * 155) : 204;
+            // Se dibuja exactamente igual que los verdes, sin wrappers que lo deformen, solo en escala de grises
+            drawGradientTriangle(mainCtx, t.x, t.y, t.size, intensity, intensity, intensity, 1);
             if (t.glow > 0) t.glow -= 0.02;
         });
 
-        // 2. Actualizar y Dibujar Piezas Rojas
+        // 2. Actualizar y Dibujar Piezas Verdes
         successCount = 0;
         pieces.forEach(p => {
             let t = targets[p.targetIndex];
 
             if (!t.matched) {
-                // Aplicar aceleración por inclinación (van rápido)
-                p.vx += gravityX * 0.4;
-                p.vy += gravityY * 0.4;
+                p.vx += gravityX * 0.4 * difficultyMultiplier;
+                p.vy += gravityY * 0.4 * difficultyMultiplier;
                 
-                // Fricción para que no se descontrolen infinitamente
                 p.vx *= 0.85;
                 p.vy *= 0.85;
-
                 p.x += p.vx;
                 p.y += p.vy;
 
-                // Límites de la pantalla (Bounce simple)
                 if (p.x < 0 || p.x > mainCanvas.width) p.vx *= -0.5;
                 if (p.y < 0 || p.y > mainCanvas.height) p.vy *= -0.5;
                 p.x = Math.max(0, Math.min(mainCanvas.width, p.x));
                 p.y = Math.max(0, Math.min(mainCanvas.height, p.y));
 
-                // Detección de encaje (Distancia corta entre centros)
                 let dist = Math.hypot(p.x - t.x, p.y - t.y);
-                if (dist < 12) { 
+                if (dist < 15) { 
                     t.matched = true;
-                    t.glow = 1.0; // Activa iluminación máxima
-                    p.x = t.x; // Clavar en su lugar exacto
+                    t.glow = 1.0; 
+                    p.x = t.x; 
                     p.y = t.y;
+                    currentBg = (currentBg + 1) % bgColors.length; // Flash de fondo
                 }
             }
 
-            // Dibujar la pieza roja si no está totalmente encajada o si brilla
             if (!t.matched) {
-                drawTriangle(mainCtx, p.x, p.y, p.size, p.angle, "#FF0000");
+                // Dibujo directo sin rotaciones, color verde idéntico (50, 205, 50)
+                drawGradientTriangle(mainCtx, p.x, p.y, p.size, 50, 205, 50, 1);
             } else {
                 successCount++;
             }
         });
 
-        // 3. Condición de Victoria Anticlímax (Todos encajados)
+        // 3. Victoria
         if (successCount === targets.length && !gameOverTimeout) {
-            // Espera 1.5 segundos iluminados creando expectativa, y destruye la escena volviendo al menú
             gameOverTimeout = setTimeout(() => {
-                window.removeEventListener('deviceorientation', handleOrientation);
-                cancelAnimationFrame(animation);
-                
-                // Lógica para cerrar el overlay/volver al menú
                 const overlay = document.getElementById("overlay");
                 if (overlay) overlay.style.display = "none"; 
-                
-                alert("Fin del sistema. Volviendo al menú."); // Remueve o cambia por tu función de cierre
             }, 1500);
         }
     }
-
     animate();
 }
