@@ -170,6 +170,7 @@ function startCirculo2() {
     let pulseTime = 0;
     let isResetting = false;
 
+    // Se inician 6 orbes en el círculo grande
     let orbs = [];
     for(let i=0; i<6; i++) {
         orbs.push({
@@ -284,17 +285,24 @@ function startCirculo2() {
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
         pulseTime += 0.1;
 
-        // --- CÁLCULO DE TAMAÑOS DINÁMICOS ---
-        // Máximo 3 orbes cuentan para cambiar el tamaño (logrando el empate)
+        // --- CÁLCULO DE TAMAÑOS DINÁMICOS (EQUIDAD) ---
+        // Punto de equilibrio donde ambos círculos tendrán el mismo tamaño
+        let radioEquilibrio = (bigC.baseRadius + smallC.baseRadius) / 2;
         let factorCrecimiento = Math.min(smallC.acceptedCount, 3);
-        let diffRadios = bigC.baseRadius - smallC.baseRadius; // 25 px de diferencia
         
-        let targetRadioGrande = bigC.baseRadius - (factorCrecimiento * (diffRadios / 3)); 
-        let targetRadioChico = smallC.baseRadius + (factorCrecimiento * (diffRadios / 3));
+        // Cuánto debe cambiar el radio por cada orbe aceptado
+        let pasoGrande = (bigC.baseRadius - radioEquilibrio) / 3; 
+        let pasoChico = (radioEquilibrio - smallC.baseRadius) / 3;
+
+        let targetRadioGrande = bigC.baseRadius - (factorCrecimiento * pasoGrande); 
+        let targetRadioChico = smallC.baseRadius + (factorCrecimiento * pasoChico);
 
         // Animación suave de los contenedores
         bigC.radius += (targetRadioGrande - bigC.radius) * 0.1;
         smallC.radius += (targetRadioChico - smallC.radius) * 0.1;
+
+        // Limpiar sobras de sombras antes de dibujar
+        mainCtx.shadowBlur = 0;
 
         // --- DIBUJAR CONTENEDOR GRANDE ---
         mainCtx.beginPath();
@@ -310,6 +318,12 @@ function startCirculo2() {
         mainCtx.arc(smallC.x, smallC.y, smallC.radius, 0, Math.PI * 2);
         let alphaC2 = 0.3 + Math.abs(Math.sin(pulseTime)) * 0.7; 
         
+        // Efecto de luz violeta cuando requiere orbes
+        if (smallC.acceptedCount < 3) {
+            mainCtx.shadowBlur = 15 + Math.sin(pulseTime) * 10;
+            mainCtx.shadowColor = "rgba(200, 162, 255, 0.8)";
+        }
+        
         // Si tiene 3, se rellena igual que el grande para marcar el empate
         if (smallC.isPressed || smallC.acceptedCount >= 3) {
             mainCtx.fillStyle = `rgba(200, 162, 255, ${smallC.acceptedCount >= 3 ? '0.4' : '0.2'})`;
@@ -321,6 +335,9 @@ function startCirculo2() {
             mainCtx.strokeStyle = `rgba(200, 162, 255, ${alphaC2})`;
         }
         mainCtx.stroke();
+        
+        // Reiniciar las sombras para no afectar a los orbes
+        mainCtx.shadowBlur = 0;
 
         // --- REINICIO POR EMPATE ---
         if (smallC.acceptedCount >= 3 && !isResetting) {
@@ -342,7 +359,7 @@ function startCirculo2() {
                 o.x += (targetX - o.x) * 0.05;
                 o.y += (targetY - o.y) * 0.05;
                 
-                // Limitar al interior del círculo grande
+                // Limitar al interior del círculo grande (dinámico)
                 let distToCenter = Math.hypot(o.x - bigC.x, o.y - bigC.y);
                 if (distToCenter > bigC.radius - o.radius - 5) {
                     let angle = Math.atan2(o.y - bigC.y, o.x - bigC.x);
@@ -383,22 +400,19 @@ function startCirculo2() {
                 o.y += (smallC.y - o.y) * 0.1;
             }
 
-            // Orbes amarillos (R:255, G:235, B:59)
-            // Asumo que tienes tu función drawGradientCircle disponible en el entorno
+            // --- DIBUJADO DE ORBES (Violetas) ---
             if (typeof drawGradientCircle === 'function') {
-                drawGradientCircle(mainCtx, o.x, o.y, o.radius, 255, 235, 59, 1);
+                drawGradientCircle(mainCtx, o.x, o.y, o.radius, 200, 162, 255, 1);
             } else {
-                // Fallback por si acaso
                 mainCtx.beginPath();
                 mainCtx.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
-                mainCtx.fillStyle = "rgb(255, 235, 59)";
+                mainCtx.fillStyle = "rgb(200, 162, 255)";
                 mainCtx.fill();
             }
         });
     }
     animate();
 }
-
 // ==========================================
 // CÍRCULO 3: UNIÓN Y SATURACIÓN
 // ==========================================
