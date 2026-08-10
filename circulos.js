@@ -158,21 +158,22 @@ function startCirculo1() {
     animate();
 }
 // ==========================================
-// CÍRCULO 2: LANZAMIENTO Y DESLIZAMIENTO
+// CÍRCULO 2: LANZAMIENTO, DESLIZAMIENTO Y EQUIDAD
 // ==========================================
 function startCirculo2() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
     
-    // Contenedores con un radio base para calcular el crecimiento
-    let bigC = { x: cx - 60, y: cy, radius: 70, baseRadius: 70 };
-    let smallC = { x: cx + 80, y: cy, radius: 45, baseRadius: 45, isPressed: false, touchId: null, acceptedCount: 0 };
+    // Contenedores. Ahora baseRadius es el tamaño cuando están VACÍOS (0 orbes)
+    let bigC = { x: cx - 75, y: cy, radius: 75, baseRadius: 45, isPressed: false, touchId: null };
+    let smallC = { x: cx + 75, y: cy, radius: 45, baseRadius: 45, isPressed: false, touchId: null };
     let pulseTime = 0;
     let isResetting = false;
+    let animation;
 
-    // Se inician 6 orbes en el círculo grande
+    // Se inician 6 orbes, todos pertenecientes al círculo grande al principio
     let orbs = [];
-    for(let i=0; i<6; i++) {
+    for(let i = 0; i < 6; i++) {
         orbs.push({
             id: i,
             x: bigC.x, 
@@ -180,6 +181,7 @@ function startCirculo2() {
             radius: 12,
             vx: 0, vy: 0,
             isDragging: false, touchId: null, state: 'idle',
+            owner: 'big', // Puede ser 'big' o 'small'
             lastTouchs: []
         });
     }
@@ -197,10 +199,16 @@ function startCirculo2() {
             let touch = e.changedTouches[i];
             let pos = getCanvasPos(touch);
 
-            // Seleccionar contenedor vacio (pequeño)
+            // Seleccionar/Abrir contenedor pequeño
             if (Math.hypot(pos.x - smallC.x, pos.y - smallC.y) < smallC.radius * 1.5) {
                 smallC.isPressed = true;
                 smallC.touchId = touch.identifier;
+            }
+
+            // Seleccionar/Abrir contenedor grande (por si quieren devolver bolas)
+            if (Math.hypot(pos.x - bigC.x, pos.y - bigC.y) < bigC.radius * 1.5) {
+                bigC.isPressed = true;
+                bigC.touchId = touch.identifier;
             }
 
             // Agarrar orbe
@@ -228,13 +236,13 @@ function startCirculo2() {
                 }
             });
 
+            // Mantener presionado el pequeño
             if (smallC.touchId === touch.identifier) {
-                if (Math.hypot(pos.x - smallC.x, pos.y - smallC.y) > smallC.radius * 2) {
-                    smallC.isPressed = false;
-                    smallC.touchId = null;
-                } else {
-                    smallC.isPressed = true;
-                }
+                smallC.isPressed = Math.hypot(pos.x - smallC.x, pos.y - smallC.y) <= smallC.radius * 2;
+            }
+            // Mantener presionado el grande
+            if (bigC.touchId === touch.identifier) {
+                bigC.isPressed = Math.hypot(pos.x - bigC.x, pos.y - bigC.y) <= bigC.radius * 2;
             }
         }
     }
@@ -247,6 +255,10 @@ function startCirculo2() {
                 smallC.isPressed = false;
                 smallC.touchId = null;
             }
+            if (bigC.touchId === touch.identifier) {
+                bigC.isPressed = false;
+                bigC.touchId = null;
+            }
 
             orbs.forEach(o => {
                 if (o.isDragging && o.touchId === touch.identifier) {
@@ -254,13 +266,20 @@ function startCirculo2() {
                     o.touchId = null;
                     
                     let distToSmall = Math.hypot(o.x - smallC.x, o.y - smallC.y);
+                    let distToBig = Math.hypot(o.x - bigC.x, o.y - bigC.y);
                     
-                    // Si se soltó directamente dentro del pequeño y está presionado
-                    if (distToSmall < smallC.radius && smallC.isPressed && smallC.acceptedCount < 3) {
-                        o.state = 'accepted';
-                        smallC.acceptedCount++;
-                    } else {
-                        // Lanzamiento con inercia (flick)
+                    // Si se soltó en el pequeño y está presionado
+                    if (distToSmall < smallC.radius && smallC.isPressed) {
+                        o.owner = 'small';
+                        o.state = 'idle';
+                    } 
+                    // Si se soltó en el grande (permite devolver bolas)
+                    else if (distToBig < bigC.radius) {
+                        o.owner = 'big';
+                        o.state = 'idle';
+                    } 
+                    else {
+                        // Lanzamiento con inercia (flick) si quedó afuera
                         if (o.lastTouchs.length > 1) {
                             let first = o.lastTouchs[0];
                             let last = o.lastTouchs[o.lastTouchs.length - 1];
@@ -285,87 +304,86 @@ function startCirculo2() {
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
         pulseTime += 0.1;
 
-        // --- CÁLCULO DE TAMAÑOS DINÁMICOS (EQUIDAD) ---
-        // Punto de equilibrio donde ambos círculos tendrán el mismo tamaño
-        let radioEquilibrio = (bigC.baseRadius + smallC.baseRadius) / 2;
-        let factorCrecimiento = Math.min(smallC.acceptedCount, 3);
+        // --- CÁLCULO DE TAMAÑOS DINÁMICOS (EQUIDAD REAL) ---
+        // Contamos dinámicamente cuántos orbes tiene cada uno
+        let smallCount = orbs.filter(o => o.owner === 'small').length;
+        let bigCount = 6 - smallCount;
         
-        // Cuánto debe cambiar el radio por cada orbe aceptado
-        let pasoGrande = (bigC.baseRadius - radioEquilibrio) / 3; 
-        let pasoChico = (radioEquilibrio - smallC.baseRadius) / 3;
+        // Cada orbe suma 5 unidades de tamaño al radio base (45)
+        // 0 orbes = radio 45 | 3 orbes = radio 60 | 6 orbes = radio 75
+        let targetRadioChico = smallC.baseRadius + (smallCount * 5);
+        let targetRadioGrande = bigC.baseRadius + (bigCount * 5);
 
-        let targetRadioGrande = bigC.baseRadius - (factorCrecimiento * pasoGrande); 
-        let targetRadioChico = smallC.baseRadius + (factorCrecimiento * pasoChico);
-
-        // Animación suave de los contenedores
+        // Animación suave de los tamaños
         bigC.radius += (targetRadioGrande - bigC.radius) * 0.1;
         smallC.radius += (targetRadioChico - smallC.radius) * 0.1;
 
-        // Limpiar sobras de sombras antes de dibujar
         mainCtx.shadowBlur = 0;
 
         // --- DIBUJAR CONTENEDOR GRANDE ---
         mainCtx.beginPath();
         mainCtx.arc(bigC.x, bigC.y, bigC.radius, 0, Math.PI * 2);
-        mainCtx.fillStyle = "rgba(200, 162, 255, 0.4)"; // Relleno violeta
+        // El color se iguala visualmente al llegar a la equidad (3)
+        mainCtx.fillStyle = `rgba(200, 162, 255, ${bigCount >= 3 ? '0.4' : '0.2'})`;
         mainCtx.fill();
         mainCtx.strokeStyle = "rgba(200, 162, 255, 1)";
-        mainCtx.lineWidth = 2;
+        mainCtx.lineWidth = (bigCount === 3) ? 3 : (bigC.isPressed ? 2.5 : 1.5);
         mainCtx.stroke();
 
         // --- DIBUJAR CONTENEDOR PEQUEÑO ---
         mainCtx.beginPath();
         mainCtx.arc(smallC.x, smallC.y, smallC.radius, 0, Math.PI * 2);
-        let alphaC2 = 0.3 + Math.abs(Math.sin(pulseTime)) * 0.7; 
         
-        // Efecto de luz violeta cuando requiere orbes
-        if (smallC.acceptedCount < 3) {
-            mainCtx.shadowBlur = 15 + Math.sin(pulseTime) * 10;
-            mainCtx.shadowColor = "rgba(200, 162, 255, 0.8)";
+        // Efecto de luz solo si no hay equidad y necesita atención
+        if (smallCount !== 3 && !isResetting) {
+            mainCtx.shadowBlur = 10 + Math.sin(pulseTime) * 5;
+            mainCtx.shadowColor = "rgba(200, 162, 255, 0.6)";
         }
         
-        // Si tiene 3, se rellena igual que el grande para marcar el empate
-        if (smallC.isPressed || smallC.acceptedCount >= 3) {
-            mainCtx.fillStyle = `rgba(200, 162, 255, ${smallC.acceptedCount >= 3 ? '0.4' : '0.2'})`;
-            mainCtx.fill();
-            mainCtx.lineWidth = 3;
-            mainCtx.strokeStyle = `rgba(200, 162, 255, 1)`;
-        } else {
-            mainCtx.lineWidth = 1.5;
-            mainCtx.strokeStyle = `rgba(200, 162, 255, ${alphaC2})`;
-        }
+        mainCtx.fillStyle = `rgba(200, 162, 255, ${smallCount >= 3 ? '0.4' : (smallC.isPressed ? '0.3' : '0.2')})`;
+        mainCtx.fill();
+        mainCtx.lineWidth = (smallCount === 3) ? 3 : (smallC.isPressed ? 2.5 : 1.5);
+        mainCtx.strokeStyle = "rgba(200, 162, 255, 1)";
         mainCtx.stroke();
         
-        // Reiniciar las sombras para no afectar a los orbes
-        mainCtx.shadowBlur = 0;
+        mainCtx.shadowBlur = 0; // Reiniciar sombras
 
-        // --- REINICIO POR EMPATE ---
-        if (smallC.acceptedCount >= 3 && !isResetting) {
-            isResetting = true;
-            setTimeout(() => {
-                cancelAnimationFrame(animation);
-                startCirculo2(); // Reinicia la experiencia
-            }, 3000); // 3 segundos de pausa mostrando el empate
+        // --- REINICIO POR EQUIDAD PERFECTA ---
+        if (smallCount === 3 && bigCount === 3 && !isResetting) {
+            // Verificar que todas las bolas ya estén quietas (idle)
+            let allSettled = orbs.every(o => o.state === 'idle');
+            if (allSettled) {
+                isResetting = true;
+                setTimeout(() => {
+                    cancelAnimationFrame(animation);
+                    startCirculo2(); // Reinicia la experiencia
+                }, 3000); // 3 segundos contemplando la equidad
+            }
         }
 
         // --- LÓGICA DE ORBES ---
         orbs.forEach((o, index) => {
-            if (o.state === 'idle') {
-                // Separarlos para que sea fácil deslizar de a uno
-                let targetX = bigC.x + bigC.radius - 20;
-                let spacing = (bigC.radius * 2) / 7;
-                let targetY = (bigC.y - bigC.radius + spacing) + (index * spacing);
+            let targetCenter = o.owner === 'big' ? bigC : smallC;
 
-                o.x += (targetX - o.x) * 0.05;
-                o.y += (targetY - o.y) * 0.05;
+            if (o.state === 'idle') {
+                // Se distribuyen suavemente en forma circular dentro de su contenedor
+                let angle = (o.id * Math.PI * 2) / (targetCenter.owner === 'big' ? bigCount : smallCount);
+                // Distancia al centro proporcional al tamaño del círculo
+                let offsetDist = targetCenter.radius * 0.4; 
+                let tx = targetCenter.x + Math.cos(angle) * offsetDist;
+                let ty = targetCenter.y + Math.sin(angle) * offsetDist;
+
+                o.x += (tx - o.x) * 0.05;
+                o.y += (ty - o.y) * 0.05;
                 
-                // Limitar al interior del círculo grande (dinámico)
-                let distToCenter = Math.hypot(o.x - bigC.x, o.y - bigC.y);
-                if (distToCenter > bigC.radius - o.radius - 5) {
-                    let angle = Math.atan2(o.y - bigC.y, o.x - bigC.x);
-                    o.x = bigC.x + Math.cos(angle) * (bigC.radius - o.radius - 5);
-                    o.y = bigC.y + Math.sin(angle) * (bigC.radius - o.radius - 5);
+                // Limitar para que no se salgan del borde
+                let distToCenter = Math.hypot(o.x - targetCenter.x, o.y - targetCenter.y);
+                if (distToCenter > targetCenter.radius - o.radius - 2) {
+                    let limitAngle = Math.atan2(o.y - targetCenter.y, o.x - targetCenter.x);
+                    o.x = targetCenter.x + Math.cos(limitAngle) * (targetCenter.radius - o.radius - 2);
+                    o.y = targetCenter.y + Math.sin(limitAngle) * (targetCenter.radius - o.radius - 2);
                 }
+
             } else if (o.state === 'flying') {
                 o.x += o.vx;
                 o.y += o.vy;
@@ -373,34 +391,28 @@ function startCirculo2() {
                 o.vy *= 0.96;
 
                 let distToSmall = Math.hypot(o.x - smallC.x, o.y - smallC.y);
+                let distToBig = Math.hypot(o.x - bigC.x, o.y - bigC.y);
                 
-                // Entra si el contenedor chico está presionado y necesita orbes
-                if (distToSmall < smallC.radius) {
-                    if (smallC.isPressed && smallC.acceptedCount < 3) {
-                        o.state = 'accepted';
-                        smallC.acceptedCount++;
-                    } else {
-                        // Rebote si no está apretado o ya tiene 3
-                        o.vx *= -1;
-                        o.vy *= -1;
-                    }
+                // Si en el aire entran a un círculo, se las apropia
+                if (distToSmall < smallC.radius && smallC.isPressed) {
+                    o.owner = 'small';
+                    o.state = 'idle';
+                } else if (distToBig < bigC.radius && bigC.isPressed) {
+                    o.owner = 'big';
+                    o.state = 'idle';
                 }
                 
-                // Si pierde inercia, vuelve
+                // Si pierde inercia y no cayó en ninguno, vuelve a su dueño original
                 if (Math.abs(o.vx) < 0.5 && Math.abs(o.vy) < 0.5) {
                     o.state = 'returning';
                 }
             } else if (o.state === 'returning') {
-                o.x += (bigC.x - o.x) * 0.05;
-                o.y += (bigC.y - o.y) * 0.05;
-                if (Math.hypot(o.x - bigC.x, o.y - bigC.y) < 20) o.state = 'idle';
-            } else if (o.state === 'accepted') {
-                // Se agrupan suavemente en el centro del pequeño
-                o.x += (smallC.x - o.x) * 0.1;
-                o.y += (smallC.y - o.y) * 0.1;
+                o.x += (targetCenter.x - o.x) * 0.05;
+                o.y += (targetCenter.y - o.y) * 0.05;
+                if (Math.hypot(o.x - targetCenter.x, o.y - targetCenter.y) < 20) o.state = 'idle';
             }
 
-            // --- DIBUJADO DE ORBES (Violetas) ---
+            // --- DIBUJADO DE ORBES ---
             if (typeof drawGradientCircle === 'function') {
                 drawGradientCircle(mainCtx, o.x, o.y, o.radius, 200, 162, 255, 1);
             } else {
