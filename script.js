@@ -33,6 +33,18 @@ function drawGradientCircle(ctx, x, y, radius, r, g, b, alpha = 1) {
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 }
+// CÍRCULO VIOLETA OSCURO (Fijo)
+function drawGradientCircle2(ctx, x, y, radius, alpha = 1) {
+    let gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`); 
+    // Aquí hardcodeamos el violeta oscuro (R: 75, G: 25, B: 130)
+    gradient.addColorStop(1, `rgba(75, 25, 130, ${alpha})`);  
+
+    ctx.beginPath();
+    ctx.fillStyle = gradient;
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
 
 // TRIANGULOS 
 
@@ -169,81 +181,111 @@ function openSystem(id){
     }
 }
 
-
-// PREVIEW 1
-
+// ==========================================
+// PREVIEW 1 (Cuadrado 1: Estelas y seguimiento de tap)
+// ==========================================
 const p1 = document.getElementById("preview1");
 const c1 = p1.getContext("2d");
 resizePreview(p1);
 
-let x1=0;
-let trail1=[];
+let p1Time = 0;
+let p1Sq = { x: p1.width/2, y: p1.height/2, currentX: p1.width/2, currentY: p1.height/2, trails: [] };
 
 function preview1(){
     resizePreview(p1);
-    c1.clearRect(0,0,p1.width,p1.height);
+    c1.clearRect(0, 0, p1.width, p1.height);
+    p1Time += 0.03;
 
-    let cx = p1.width/2 + Math.sin(x1)*20; 
-    let cy = p1.height/2;
+    // Simulamos un "tap" en un nuevo lugar cada cierto tiempo
+    if (Math.sin(p1Time * 2) > 0.95) {
+        p1Sq.x = (p1.width * 0.2) + Math.random() * (p1.width * 0.6);
+        p1Sq.y = (p1.height * 0.2) + Math.random() * (p1.height * 0.6);
+    }
 
-    trail1.push({ x:cx, y:cy, a:1 });
+    // El cuadrado sigue la posición del tap
+    p1Sq.currentX += (p1Sq.x - p1Sq.currentX) * 0.15;
+    p1Sq.currentY += (p1Sq.y - p1Sq.currentY) * 0.15;
 
-    trail1.forEach(t => {
-        drawGradientSquare(c1, t.x, t.y, 32, t.a);
-        t.a -= 0.03;
+    // Genera estela si se mueve rápido
+    if (Math.abs(p1Sq.x - p1Sq.currentX) > 1 || Math.abs(p1Sq.y - p1Sq.currentY) > 1) {
+        p1Sq.trails.push({ x: p1Sq.currentX, y: p1Sq.currentY, alpha: 0.6 });
+    }
+
+    // Dibuja la estela
+    p1Sq.trails.forEach(t => {
+        drawGradientSquare(c1, t.x, t.y, 28, t.alpha);
+        t.alpha -= 0.05; 
     });
+    p1Sq.trails = p1Sq.trails.filter(t => t.alpha > 0);
 
-    trail1 = trail1.filter(t => t.a > 0);
-    drawGradientSquare(c1, cx, cy, 32, 1);
-    
-    x1 += 0.03;
+    // Dibuja el cuadrado principal
+    drawGradientSquare(c1, p1Sq.currentX, p1Sq.currentY, 28, 1);
+
     requestAnimationFrame(preview1);
 }
 preview1();
 
 
-// PREVIEW 2 
-const p2=document.getElementById("preview2");
-const c2=p2.getContext("2d");
+// ==========================================
+// PREVIEW 2 (Cuadrado 2: Abuelo, Padre, Hijo y respiración)
+// ==========================================
+const p2 = document.getElementById("preview2");
+const c2 = p2.getContext("2d");
 resizePreview(p2);
-
 let p2Time = 0;
 
 function preview2(){
     resizePreview(p2);
     c2.clearRect(0,0,p2.width,p2.height);
-
     p2Time += 0.05;
-   
-    let offsetX = Math.sin(p2Time) * 12;
-    let offsetY = Math.cos(p2Time * 1.5) * 8;
 
-    drawGradientSquare(c2, p2.width/2 + offsetX, p2.height/2 + offsetY, 36, 1);
+    let cycle = (p2Time % (Math.PI * 2)); // Ciclo de vida completo
+    
+    // Padre (fase inicial -> esperando -> fading)
+    let parentAlpha = cycle < Math.PI ? 1 : Math.max(0, 1 - (cycle - Math.PI));
+    let parentSize = 25 * (1 + Math.sin(p2Time * 2) * 0.08); // Animación de respiración
+
+    // Hijo (nace pequeño -> crece con "clicks" simulados por el tiempo)
+    let babySize = 10;
+    if (cycle > 1) babySize = 15;
+    if (cycle > 2) babySize = 20;
+    if (cycle > 3) babySize = 25; // Se hace adulto
+    babySize *= (1 + Math.sin(p2Time * 2) * 0.08);
+
+    // Dibujar Padre (Abuelo desvaneciéndose)
+    if (parentAlpha > 0) {
+        drawGradientSquare(c2, p2.width/2 - 15, p2.height/2, parentSize, parentAlpha);
+    }
+    // Dibujar Hijo (Creciendo)
+    if (cycle > 0.5) {
+        drawGradientSquare(c2, p2.width/2 + 15, p2.height/2, babySize, 1);
+    }
+
     requestAnimationFrame(preview2);
 }
 preview2();
 
 
-// PREVIEW 3 
-const p3=document.getElementById("preview3");
-const c3=p3.getContext("2d");
+// PREVIEW 3: Ciclo de despegue vertical con estela disipada
+const p3 = document.getElementById("preview3");
+const c3 = p3.getContext("2d");
 resizePreview(p3);
 
-let p3Square = { x: p3.width/2, y: p3.height/2, alpha: 1 };
+let p3Square = { x: p3.width / 2, y: p3.height / 2, alpha: 1 };
 let p3Trails = [];
 
 function preview3(){
     resizePreview(p3);
-    c3.clearRect(0,0,p3.width,p3.height);
+    c3.clearRect(0, 0, p3.width, p3.height);
 
     if (p3Square.alpha > 0) {
         p3Square.x += Math.sin(p3Square.alpha * 10) * 2;
         p3Square.y -= 1.5; 
         
-        p3Trails.push({x: p3Square.x, y: p3Square.y, a: p3Square.alpha});
+        p3Trails.push({ x: p3Square.x, y: p3Square.y, a: p3Square.alpha });
         p3Square.alpha -= 0.01; 
     } else if (p3Trails.length === 0) {
-        p3Square = { x: p3.width/2, y: p3.height/2 + 20, alpha: 1 }; 
+        p3Square = { x: p3.width / 2, y: p3.height / 2 + 20, alpha: 1 }; 
     }
 
     p3Trails.forEach(t => {
@@ -258,8 +300,13 @@ function preview3(){
     requestAnimationFrame(preview3);
 }
 preview3();
+
+
 // ==========================================
-// PREVIEW 4 (Círculo 1: Multitouch - Sostener y arrastrar)
+// BLOQUE 4 AL 6: CÍRCULOS (ESTÉTICA VIOLETA / MULTITOUCH / FÍSICA)
+// ==========================================
+/// ==========================================
+// PREVIEW 4 (Círculo 1: Multitouch - 1 Claro y 1 Oscuro)
 // ==========================================
 const p4 = document.getElementById("preview4");
 const c4 = p4.getContext("2d");
@@ -268,46 +315,42 @@ let p4Time = 0;
 
 function preview4() {
     resizePreview(p4);
-    c4.clearRect(0,0,p4.width,p4.height);
+    c4.clearRect(0, 0, p4.width, p4.height);
     p4Time += 0.04;
 
     let cx = p4.width / 2;
     let cy = p4.height / 2;
 
-    // Círculo Izquierdo (Borde Verde, inactivo)
+    // Contenedor Izquierdo (Inactivo) - Violeta claro
     c4.beginPath(); 
-    c4.arc(cx - 30, cy - 10, 24, 0, Math.PI*2); 
-    c4.strokeStyle = "rgba(150, 230, 150, 1)"; 
-    c4.lineWidth = 1.5; 
-    c4.stroke();
-
-    // Círculo Derecho (Borde Violeta, presionado/activo)
-    c4.beginPath(); 
-    c4.arc(cx + 30, cy - 10, 24, 0, Math.PI*2); 
-    c4.fillStyle = "rgba(200, 162, 255, 0.2)"; 
-    c4.fill();
+    c4.arc(cx - 30, cy - 10, 24, 0, Math.PI * 2); 
     c4.strokeStyle = "rgba(200, 162, 255, 1)"; 
-    c4.lineWidth = 3; 
+    c4.lineWidth = 1; 
     c4.stroke();
 
-    // Bolita Verde (estática, esperando)
-    drawGradientCircle(c4, cx - 15, cy + 30, 9, 150, 230, 150, 1);
+    // Contenedor Derecho (Activo) - Violeta oscuro
+    c4.beginPath(); 
+    c4.arc(cx + 30, cy - 10, 24, 0, Math.PI * 2); 
+    c4.fillStyle = "rgba(75, 25, 130, 0.15)"; 
+    c4.fill();
+    c4.strokeStyle = "rgba(75, 25, 130, 1)"; 
+    c4.lineWidth = 1; 
+    c4.stroke();
 
-    // Bolita Violeta (animación simulando que el dedo la arrastra hacia el contenedor derecho)
-    let progress = (Math.sin(p4Time * 1.5) + 1) / 2; // Va de 0 a 1
-    let startX = cx + 15;
-    let startY = cy + 30;
-    let targetX = cx + 30;
-    let targetY = cy - 10;
-    
-    let currentX = startX + (targetX - startX) * progress;
-    let currentY = startY + (targetY - startY) * progress;
+    // Bolita 1 (estática en la izquierda) - Usa la función original (Claro)
+    drawGradientCircle(c4, cx - 15, cy + 30, 9, 200, 162, 255, 1);
 
-    drawGradientCircle(c4, currentX, currentY, 9, 200, 162, 255, 1);
+    // Bolita 2 (animación arrastrándose) - Usa la NUEVA función (Oscuro)
+    let progress = (Math.sin(p4Time * 1.5) + 1) / 2; 
+    let currentX = (cx + 15) + ((cx + 30) - (cx + 15)) * progress;
+    let currentY = (cy + 30) + ((cy - 10) - (cy + 30)) * progress;
+
+    drawGradientCircle2(c4, currentX, currentY, 9, 1);
 
     requestAnimationFrame(preview4);
 }
 preview4();
+
 
 // ==========================================
 // PREVIEW 5 (Círculo 2: Lanzamiento a contenedor pequeño)
@@ -361,36 +404,52 @@ function preview5(){
 preview5();
 
 // ==========================================
-// PREVIEW 6 (Círculo 3: Unión) - Sin cambios
+// PREVIEW 6 (Círculo 3: Fusión - 2 Bolitas Idénticas Violeta Oscuro)
 // ==========================================
 const p6 = document.getElementById("preview6");
 const c6 = p6.getContext("2d");
 resizePreview(p6);
 let p6Time = 0;
 
-function preview6(){
+function preview6() {
     resizePreview(p6);
     c6.clearRect(0,0,p6.width,p6.height);
-    p6Time += 0.05;
+    p6Time += 0.03;
 
-    let cy = p6.height/2 + Math.sin(p6Time) * 15; 
+    let cx = p6.width/2;
+    let cy = p6.height/2;
 
-    drawGradientCircle(c6, p6.width/2 - 15, cy, 14, 200, 160, 255, 0.8);
-    drawGradientCircle(c6, p6.width/2 + 15, cy, 14, 200, 160, 255, 0.8);
+    // Colores Violeta Oscuro
+    let r = 75, g = 25, b = 130;
+
+    let distance = 30 * Math.max(0, Math.cos(p6Time * 1.5));
+    let alpha = distance > 2 ? 1 : Math.max(0, Math.sin(p6Time * 1.5));
+
+    if (distance > 2) {
+        // Ambas bolitas idénticas y listas para fusionarse (VIOLETA OSCURO)
+        drawGradientCircle(c6, cx - distance, cy, 14, r, g, b, 1);
+        drawGradientCircle(c6, cx + distance, cy, 14, r, g, b, 1);
+    } else {
+        // Explosión o Halo de fusión
+        let haloSize = 25 + Math.sin(p6Time * 4) * 8;
+        c6.beginPath();
+        c6.arc(cx, cy, haloSize, 0, Math.PI*2);
+        c6.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.4})`;
+        c6.fill();
+        
+        // Forma fusionada en el centro
+        drawGradientCircle(c6, cx, cy, 18, r, g, b, alpha);
+    }
 
     requestAnimationFrame(preview6);
 }
 preview6();
 
+// ==========================================
+// BLOQUE 7 AL 9: TRIÁNGULOS (ESTÉTICA VERDE / ENCASTRES Y FÍSICA)
+// ==========================================
 
-const offsetsPrev = [
-    { x: 0, y: -25 },
-    { x: -22, y: 15 },
-    { x: 22, y: 15 }
-];
-
-
-// PREVIEW 7 (Para Triángulo 1: Sacudida y opacidad independiente)
+// PREVIEW 7: Sacudida interactiva y opacidad independiente por pieza
 const p7 = document.getElementById("preview7");
 const c7 = p7.getContext("2d");
 resizePreview(p7);
@@ -403,22 +462,20 @@ function preview7(){
     c7.fillRect(0, 0, p7.width, p7.height);
     p7Time += 0.05;
 
-    // Simular "sacudidas" cada cierto tiempo
     let isShaking = (p7Time % 4) > 2.5; 
     let shakeX = isShaking ? (Math.random() - 0.5) * 6 : 0;
     let shakeY = isShaking ? (Math.random() - 0.5) * 6 : 0;
 
-    // Lado a lado como el original
-    let offsets = [{x: -35, y: 0}, {x: 0, y: 0}, {x: 35, y: 0}];
+    let offsets = [{ x: -35, y: 0 }, { x: 0, y: 0 }, { x: 35, y: 0 }];
 
     offsets.forEach((off, i) => {
         if (isShaking) {
-            p7Opacities[i] += 0.05 * (i + 1) * 0.5; // Distintas velocidades de carga
-            if (p7Opacities[i] > 1) p7Opacities[i] = 0.2; // Simula destello y reinicio
+            p7Opacities[i] += 0.05 * (i + 1) * 0.5; 
+            if (p7Opacities[i] > 1) p7Opacities[i] = 0.2; 
         } else {
             p7Opacities[i] = Math.max(0.2, p7Opacities[i] - 0.02);
         }
-        drawGradientTriangle(c7, (p7.width/2) + shakeX + off.x, (p7.height/2) + shakeY + off.y, 20, 50, 205, 50, p7Opacities[i]);
+        drawGradientTriangle(c7, (p7.width / 2) + shakeX + off.x, (p7.height / 2) + shakeY + off.y, 20, 50, 205, 50, p7Opacities[i]);
     });
     
     requestAnimationFrame(preview7);
@@ -426,7 +483,7 @@ function preview7(){
 preview7();
 
 
-// PREVIEW 8 (Para Triángulo 2: Desbalance y recuperación)
+// PREVIEW 8: Desbalance físico y recuperación elástica
 const p8 = document.getElementById("preview8"); 
 const c8 = p8.getContext("2d");
 resizePreview(p8);
@@ -438,10 +495,8 @@ function preview8(){
     c8.fillRect(0, 0, p8.width, p8.height);
     p8Time += 0.05;
 
-    // 3 piezas lado a lado con distintas volatilidades
-    let offsets = [{x: -35, y: 0, mult: 1.5}, {x: 0, y: 0, mult: 0.7}, {x: 35, y: 0, mult: 1.1}];
+    let offsets = [{ x: -35, y: 0, mult: 1.5 }, { x: 0, y: 0, mult: 0.7 }, { x: 35, y: 0, mult: 1.1 }];
     
-    // Simular tambaleo y pérdida de centro
     let tiltX = Math.sin(p8Time * 2) * 18;
     let tiltY = Math.cos(p8Time * 1.5) * 10;
 
@@ -449,11 +504,10 @@ function preview8(){
         let currentX = tiltX * off.mult;
         let currentY = tiltY * off.mult;
 
-        // Opacidad baja cuando se alejan mucho (simulando reset)
         let dist = Math.hypot(currentX, currentY);
         let opacity = Math.max(0.15, 1 - (dist / 25));
 
-        drawGradientTriangle(c8, (p8.width/2) + off.x + currentX, (p8.height/2) + off.y + currentY, 20, 50, 205, 50, opacity);
+        drawGradientTriangle(c8, (p8.width / 2) + off.x + currentX, (p8.height / 2) + off.y + currentY, 20, 50, 205, 50, opacity);
     });
 
     requestAnimationFrame(preview8);
@@ -461,7 +515,7 @@ function preview8(){
 preview8();
 
 
-// PREVIEW 9 (Para Triángulo 3: Precisión de encastre libre)
+// PREVIEW 9: Precisión de encastre libre (Huecos grises estáticos + piezas deslizándose)
 const p9 = document.getElementById("preview9"); 
 const c9 = p9.getContext("2d");
 resizePreview(p9);
@@ -473,32 +527,37 @@ function preview9(){
     c9.fillRect(0, 0, p9.width, p9.height);
     p9Time += 0.025; 
 
-    // 3 huecos esparcidos
     let targets = [
-        {x: p9.width * 0.3, y: p9.height * 0.3},
-        {x: p9.width * 0.7, y: p9.height * 0.4},
-        {x: p9.width * 0.5, y: p9.height * 0.7}
+        { x: p9.width * 0.3, y: p9.height * 0.3 },
+        { x: p9.width * 0.7, y: p9.height * 0.4 },
+        { x: p9.width * 0.5, y: p9.height * 0.7 }
     ];
 
-    // Ciclo de animación para que las piezas se unan y se separen
     let cycle = (p9Time % 4) / 4; 
-    let progress = 1 - Math.pow(1 - cycle, 3); // Easing suave
-    let isMatched = cycle > 0.85; // Brillo final cuando conectan
+    let progress = 1 - Math.pow(1 - cycle, 3); 
+    let isMatched = cycle > 0.85; 
     let grayIntensity = isMatched ? 255 : 204; 
-
-    targets.forEach((t, i) => {
-        // Dibujamos el Hueco Gris (Estética perfecta, sólo en grises)
-        drawGradientTriangle(c9, t.x, t.y, 20, grayIntensity, grayIntensity, grayIntensity, 1);
+targets.forEach((t, i) => {
+        // Hueco: Contorno verde del mismo tamaño que los triángulos (radio 20)
+        c9.beginPath();
+        c9.moveTo(t.x, t.y - 20);
+        c9.lineTo(t.x + 20 * 0.866, t.y + 20 * 0.5);
+        c9.lineTo(t.x - 20 * 0.866, t.y + 20 * 0.5);
+        c9.closePath();
+        
+        c9.lineWidth = 2.5;
+        let alphaOutline = isMatched ? 1 - ((cycle - 0.85) * 6) : 0.8; // Se difumina al encastrar
+        c9.strokeStyle = `rgba(50, 205, 50, ${Math.max(0, alphaOutline)})`;
+        c9.stroke();
         
         if (!isMatched) {
-            // Posiciones iniciales dispersas para las piezas verdes
             let startX = p9.width * (i === 0 ? 0.8 : i === 1 ? 0.2 : 0.8);
             let startY = p9.height * (i === 0 ? 0.8 : i === 1 ? 0.8 : 0.2);
 
             let currentX = startX + (t.x - startX) * progress;
             let currentY = startY + (t.y - startY) * progress;
 
-            // Dibujamos la pieza verde aproximándose
+            // Pieza verde móvil acercándose al objetivo
             drawGradientTriangle(c9, currentX, currentY, 20, 50, 205, 50, 1);
         }
     });
