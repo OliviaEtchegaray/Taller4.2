@@ -5,22 +5,23 @@ function startCirculo1() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
 
+    // Dos tonos: Violeta clásico y un Violeta más oscuro
     let colors = [
-        { name: 'violet', r: 200, g: 162, b: 255 },
-        { name: 'green', r: 150, g: 230, b: 150 } // Se usa verde como solicitaste, aunque la ref sea amarilla
+        { name: 'light_violet', r: 200, g: 162, b: 255 },
+        { name: 'dark_violet', r: 120, g: 60, b: 180 } 
     ];
 
     let shuffledColors = Math.random() > 0.5 ? [colors[0], colors[1]] : [colors[1], colors[0]];
 
-    // Posiciones basadas en la estética de la imagen
+    // Contenedores más grandes (radius 85)
     let containers = [
-        { x: cx - 80, y: cy - 20, radius: 65, color: shuffledColors[0], isPressed: false, touchId: null },
-        { x: cx + 70, y: cy - 60, radius: 65, color: shuffledColors[1], isPressed: false, touchId: null }
+        { x: cx - 90, y: cy - 20, radius: 85, color: shuffledColors[0], isPressed: false, touchId: null },
+        { x: cx + 90, y: cy - 60, radius: 85, color: shuffledColors[1], isPressed: false, touchId: null }
     ];
 
     let orbs = [
-        { id: 1, startX: cx - 20, startY: cy + 90, x: cx - 20, y: cy + 90, radius: 18, color: colors[1], isDragging: false, touchId: null, state: 'idle' },
-        { id: 2, startX: cx + 80, startY: cy + 70, x: cx + 80, y: cy + 70, radius: 18, color: colors[0], isDragging: false, touchId: null, state: 'idle' }
+        { id: 1, startX: cx - 40, startY: cy + 120, x: cx - 40, y: cy + 120, radius: 22, color: colors[1], isDragging: false, touchId: null, state: 'idle' },
+        { id: 2, startX: cx + 40, startY: cy + 120, x: cx + 40, y: cy + 120, radius: 22, color: colors[0], isDragging: false, touchId: null, state: 'idle' }
     ];
 
     function getCanvasPos(touch) {
@@ -36,6 +37,7 @@ function startCirculo1() {
             let touch = e.changedTouches[i];
             let pos = getCanvasPos(touch);
 
+            // Verificar si presionan un contenedor
             containers.forEach(c => {
                 if (Math.hypot(pos.x - c.x, pos.y - c.y) < c.radius) {
                     c.isPressed = true;
@@ -43,6 +45,7 @@ function startCirculo1() {
                 }
             });
 
+            // Verificar si agarran una bolita
             orbs.forEach(o => {
                 if (Math.hypot(pos.x - o.x, pos.y - o.y) < o.radius * 3 && o.state !== 'accepted') {
                     o.isDragging = true;
@@ -65,6 +68,7 @@ function startCirculo1() {
                 }
             });
 
+            // Si el dedo sale del contenedor, se desactiva
             containers.forEach(c => {
                 if (c.touchId === touch.identifier) {
                     if (Math.hypot(pos.x - c.x, pos.y - c.y) > c.radius * 1.5) {
@@ -102,11 +106,12 @@ function startCirculo1() {
                     });
 
                     if (droppedInContainer) {
+                        // CONDICIÓN: Contenedor presionado Y colores coincidentes
                         if (droppedInContainer.isPressed && droppedInContainer.color.name === o.color.name) {
                             o.state = 'accepted';
                             o.targetC = droppedInContainer;
                         } else {
-                            o.state = 'bouncing';
+                            o.state = 'bouncing'; // Rechazado (color incorrecto o contenedor no presionado)
                         }
                     } else {
                         o.state = 'bouncing';
@@ -120,7 +125,6 @@ function startCirculo1() {
     mainCanvas.ontouchmove = (e) => { e.preventDefault(); onTouchMove(e); };
     mainCanvas.ontouchend = (e) => { e.preventDefault(); onTouchEnd(e); };
     mainCanvas.ontouchcancel = (e) => { e.preventDefault(); onTouchEnd(e); };
-    mainCanvas.onmousedown = null; mainCanvas.onmousemove = null; mainCanvas.onmouseup = null;
 
     function animate() {
         animation = requestAnimationFrame(animate);
@@ -130,12 +134,14 @@ function startCirculo1() {
             mainCtx.beginPath();
             mainCtx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
             let colorStr = `rgba(${c.color.r}, ${c.color.g}, ${c.color.b}, 1)`;
+            
             if (c.isPressed) {
+                // Relleno sutil para indicar que está activado/presionado
                 mainCtx.fillStyle = `rgba(${c.color.r}, ${c.color.g}, ${c.color.b}, 0.2)`;
                 mainCtx.fill();
                 mainCtx.lineWidth = 4;
             } else {
-                mainCtx.lineWidth = 1;
+                mainCtx.lineWidth = 2;
             }
             mainCtx.strokeStyle = colorStr;
             mainCtx.stroke();
@@ -147,11 +153,29 @@ function startCirculo1() {
                 o.y += (o.startY - o.y) * 0.15;
                 if (Math.hypot(o.x - o.startX, o.y - o.startY) < 1) o.state = 'idle';
             } else if (o.state === 'accepted') {
+                // Al ser aceptado, viaja al centro y se expande hasta llenar el contenedor
                 o.x += (o.targetC.x - o.x) * 0.15;
                 o.y += (o.targetC.y - o.y) * 0.15;
-                o.radius += (o.targetC.radius * 0.6 - o.radius) * 0.1; 
+                o.radius += (o.targetC.radius - o.radius) * 0.1; 
             }
-            drawGradientCircle(mainCtx, o.x, o.y, o.radius, o.color.r, o.color.g, o.color.b, 1);
+            
+            // Base de la bolita
+            if (typeof drawGradientCircle === 'function') {
+                drawGradientCircle(mainCtx, o.x, o.y, o.radius, o.color.r, o.color.g, o.color.b, 1);
+            } else {
+                mainCtx.beginPath();
+                mainCtx.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
+                mainCtx.fillStyle = `rgb(${o.color.r}, ${o.color.g}, ${o.color.b})`;
+                mainCtx.fill();
+            }
+
+            // Destello blanco en el centro para mantener la estética
+            if (o.state !== 'accepted' || o.radius < o.targetC.radius * 0.9) {
+                mainCtx.beginPath();
+                mainCtx.arc(o.x, o.y, o.radius * 0.4, 0, Math.PI * 2);
+                mainCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                mainCtx.fill();
+            }
         });
     }
     
