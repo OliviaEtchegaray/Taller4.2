@@ -1,7 +1,10 @@
-// 1
 function startTriangulo1() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
+    
+    // Variables para el efecto visual de temblor
+    let shakeX = 0;
+    let shakeY = 0;
     
     // Lógica de fondos
     const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
@@ -33,6 +36,10 @@ function startTriangulo1() {
         let acc = event.accelerationIncludingGravity || event.acceleration;
         if (!acc) return;
         
+        // Efecto visual: capturamos la aceleración cruda para hacer que tiemblen
+        shakeX = -(acc.x || 0) * 3; 
+        shakeY = (acc.y || 0) * 3;
+        
         let force = Math.abs(acc.x||0) + Math.abs(acc.y||0) + Math.abs(acc.z||0);
         if (force > 15) { 
             triangles.forEach(t => {
@@ -45,6 +52,10 @@ function startTriangulo1() {
     }
 
     function handleManualSwipe() {
+        // Fallback visual para mouse/touch
+        shakeX = (Math.random() - 0.5) * 10;
+        shakeY = (Math.random() - 0.5) * 10;
+        
         triangles.forEach(t => {
             if (!t.flashed) {
                 t.opacity += 0.1 * t.rate;
@@ -66,6 +77,10 @@ function startTriangulo1() {
     function animate() {
         animation = requestAnimationFrame(animate);
         
+        // Suavizado del temblor (vuelve al centro si dejas de moverlo)
+        shakeX *= 0.85;
+        shakeY *= 0.85;
+        
         // Dibujado del fondo
         if(currentBg !== -1) {
             drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
@@ -77,8 +92,12 @@ function startTriangulo1() {
         // Dibujar los 3 triángulos verdes independientes
         triangles.forEach(t => {
             if(t.opacity > 0.2 && !t.flashed) t.opacity -= 0.005;
-            // RGB verde estandarizado
-            drawGradientTriangle(mainCtx, cx + t.offsetX, cy + t.offsetY, 50, 50, 205, 50, t.opacity);
+            
+            // Sumamos el shakeX y shakeY a la posición de dibujo
+            let drawX = cx + t.offsetX + shakeX;
+            let drawY = cy + t.offsetY + shakeY;
+            
+            drawGradientTriangle(mainCtx, drawX, drawY, 50, 50, 205, 50, t.opacity);
         });
     }
     animate();
@@ -202,7 +221,6 @@ function startTriangulo3() {
         difficultyMultiplier += 0.3;
     }, 5000);
 
-    // Huecos dispersos. Eliminé los ángulos, ahora son rectos e idénticos a los T1 y T2
     let targets = [
         { x: mainCanvas.width * 0.3, y: mainCanvas.height * 0.3, size: 50, matched: false, glow: 0 },
         { x: mainCanvas.width * 0.7, y: mainCanvas.height * 0.4, size: 50, matched: false, glow: 0 },
@@ -254,15 +272,27 @@ function startTriangulo3() {
             gravityX = 0; gravityY = 0;
         }
 
-        // 1. Dibujar Huecos Grises DIRECTAMENTE
+        // 1. Dibujar Huecos (SOLO CONTORNOS VERDES)
         targets.forEach(t => {
-            let intensity = t.matched ? (100 + t.glow * 155) : 204;
-            // Se dibuja exactamente igual que los verdes, sin wrappers que lo deformen, solo en escala de grises
-            drawGradientTriangle(mainCtx, t.x, t.y, t.size, intensity, intensity, intensity, 1);
             if (t.glow > 0) t.glow -= 0.02;
+
+            mainCtx.beginPath();
+            // Matemáticas estándar para dibujar un triángulo equilátero hacia arriba
+            mainCtx.moveTo(t.x, t.y - t.size);
+            mainCtx.lineTo(t.x + t.size * 0.866, t.y + t.size * 0.5);
+            mainCtx.lineTo(t.x - t.size * 0.866, t.y + t.size * 0.5);
+            mainCtx.closePath();
+
+            // Configuramos la línea
+            mainCtx.lineWidth = 4;
+            // Si no está emparejado, es un contorno verde sólido. 
+            // Si está emparejado (matched), se difumina con el valor "glow".
+            let alpha = t.matched ? t.glow : 0.8;
+            mainCtx.strokeStyle = `rgba(50, 205, 50, ${alpha})`;
+            mainCtx.stroke();
         });
 
-        // 2. Actualizar y Dibujar Piezas Verdes
+        // 2. Actualizar y Dibujar Piezas Verdes (Rellenas)
         successCount = 0;
         pieces.forEach(p => {
             let t = targets[p.targetIndex];
@@ -292,9 +322,11 @@ function startTriangulo3() {
             }
 
             if (!t.matched) {
-                // Dibujo directo sin rotaciones, color verde idéntico (50, 205, 50)
+                // Pieza suelta a encajar
                 drawGradientTriangle(mainCtx, p.x, p.y, p.size, 50, 205, 50, 1);
             } else {
+                // Cuando encajan, dibuja el relleno estático en el hueco
+                drawGradientTriangle(mainCtx, t.x, t.y, t.size, 50, 205, 50, 1);
                 successCount++;
             }
         });
