@@ -2,143 +2,206 @@
 // 1
 
 function startBlue1(){
-    let trails = [];
-    let square = { x: mainCanvas.width / 2, y: mainCanvas.height / 2, size: 70 };
-    let pointer = { x: square.x, y: square.y };
-    let isCrashed = false; 
+    let squares = [];
+    let startTime = Date.now();
+    let initialLifespan = 4.0; 
+    let minLifespan = 0.8;     
 
-    // Lógica de fondos
-    const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
+    // Guardamos la posición del último tap. Iniciamos en el centro de la pantalla.
+    let lastX = mainCanvas.width / 2;
+    let lastY = mainCanvas.height / 2;
+
+    const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"];
     let currentBg = -1;
 
-    function updatePointer(e) {
-        if(isCrashed) return; 
+    function handleTap(e) {
         const rect = mainCanvas.getBoundingClientRect();
         let clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        pointer.x = (clientX - rect.left) * (mainCanvas.width / rect.width);
-        pointer.y = (clientY - rect.top) * (mainCanvas.height / rect.height);
+        let targetX = (clientX - rect.left) * (mainCanvas.width / rect.width);
+        let targetY = (clientY - rect.top) * (mainCanvas.height / rect.height);
+
+        let elapsedSeconds = (Date.now() - startTime) / 1000;
+        let currentLifespan = Math.max(minLifespan, initialLifespan - (elapsedSeconds * 0.05));
+
+        currentBg = (squares.length + 1) % bgColors.length;
+
+        squares.push({
+            x: targetX,
+            y: targetY,
+            // Nace en la posición del click anterior
+            currentX: lastX,
+            currentY: lastY,
+            size: 70,
+            trails: [],
+            maxLife: currentLifespan,
+            life: currentLifespan,
+            alpha: 1
+        });
+
+        // Actualizamos el último tap para el siguiente cuadrado
+        lastX = targetX;
+        lastY = targetY;
     }
 
-    mainCanvas.onmousemove = updatePointer;
-    mainCanvas.ontouchmove = (e) => { e.preventDefault(); updatePointer(e); };
-    mainCanvas.ontouchstart = (e) => { e.preventDefault(); updatePointer(e); };
+    mainCanvas.onmousedown = handleTap;
+    mainCanvas.ontouchstart = (e) => { e.preventDefault(); handleTap(e); };
 
-    function resetSystem() {
-        isCrashed = true;
-        currentBg = (currentBg + 1) % bgColors.length; 
-
-        setTimeout(() => {
-            square.x = mainCanvas.width / 2;
-            square.y = mainCanvas.height / 2;
-            pointer.x = square.x;
-            pointer.y = square.y;
-            trails = [];
-            isCrashed = false;
-        }, 1500); 
-    }
-
-    function animate(){
+    function animate() {
         animation = requestAnimationFrame(animate);
-        mainCtx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
 
-    
-        if(currentBg !== -1) {
+        if (currentBg !== -1) {
             drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
         }
 
-        if(!isCrashed) {
-            square.x += (pointer.x - square.x) * 0.12;
-            square.y += (pointer.y - square.y) * 0.12;
+        for (let i = squares.length - 1; i >= 0; i--) {
+            let sq = squares[i];
 
-            for (let i = 0; i < trails.length - 15; i++) {
-                let t = trails[i];
-                let dx = square.x - t.x;
-                let dy = square.y - t.y;
-                if (Math.sqrt(dx*dx + dy*dy) < square.size * 0.4 && t.alpha > 0.15) {
-                    resetSystem();
-                    break;
-                }
+            sq.currentX += (sq.x - sq.currentX) * 0.15;
+            sq.currentY += (sq.y - sq.currentY) * 0.15;
+
+            sq.life -= 1 / 60;
+            sq.alpha = Math.max(0, sq.life / sq.maxLife);
+
+            if (Math.abs(sq.x - sq.currentX) > 1 || Math.abs(sq.y - sq.currentY) > 1) {
+                sq.trails.push({
+                    x: sq.currentX,
+                    y: sq.currentY,
+                    size: sq.size,
+                    alpha: sq.alpha * 0.6
+                });
             }
-            trails.push({ x: square.x, y: square.y, alpha: 1, size: square.size });
-        }
 
-        trails.forEach(t => {
-            drawGradientSquare(mainCtx, t.x, t.y, t.size, t.alpha);
-            t.alpha -= 0.012;
-        });
-        trails = trails.filter(t => t.alpha > 0);
-        drawGradientSquare(mainCtx, square.x, square.y, square.size, 1);
+            sq.trails.forEach(t => {
+                drawGradientSquare(mainCtx, t.x, t.y, t.size, t.alpha);
+                t.alpha -= 0.03; 
+            });
+            sq.trails = sq.trails.filter(t => t.alpha > 0);
+
+            if (sq.alpha > 0) {
+                drawGradientSquare(mainCtx, sq.currentX, sq.currentY, sq.size, sq.alpha);
+            }
+
+            if (sq.life <= 0) {
+                squares.splice(i, 1);
+            }
+        }
     }
+
     animate();
 }
-
-
 // 2
 function startBlue2(){
-    let square = { x: mainCanvas.width/2, y: mainCanvas.height/2, size: 80, scale: 1 };
-    let minis = [];
-    let pulse = 0;
-    let hasTouched = false; 
+    let time = 0;
+    let squares = [];
+    let nextId = 1;
+    
+    // Generamos el cuadrado "Abuelo" / inicial
+    squares.push({
+        id: 0,
+        parent: null, // No tiene padre
+        x: mainCanvas.width / 2,
+        y: mainCanvas.height / 2,
+        targetX: mainCanvas.width / 2,
+        targetY: mainCanvas.height / 2,
+        size: 70,
+        targetSize: 70,
+        alpha: 1,
+        phase: 'initial', // Fases: 'initial', 'baby', 'waiting', 'fading'
+        clicks: 0
+    });
 
-    function spawnMinis() {
-        for(let i=0; i<4; i++) {
-            minis.push({
-                x: square.x, y: square.y,
-                size: 15 + Math.random() * 20,
-                vx: (Math.random() - 0.5) * 12, 
-                vy: (Math.random() - 0.5) * 12, 
-                alpha: 1
-            });
-        }
-    }
-
-    function handleInteraction(e) {
-        hasTouched = true; 
-        square.scale = 1;  
-
+    function handleTap(e) {
         const rect = mainCanvas.getBoundingClientRect();
-        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        
-        let tx = (clientX - rect.left) * (mainCanvas.width / rect.width);
-        let ty = (clientY - rect.top) * (mainCanvas.height / rect.height);
+        let cx = e.touches ? e.touches[0].clientX : e.clientX;
+        let cy = e.touches ? e.touches[0].clientY : e.clientY;
+        let tx = (cx - rect.left) * (mainCanvas.width / rect.width);
+        let ty = (cy - rect.top) * (mainCanvas.height / rect.height);
 
-        if (Math.abs(tx - square.x) < square.size && Math.abs(ty - square.y) < square.size) {
-            spawnMinis();
+        for (let i = squares.length - 1; i >= 0; i--) {
+            let sq = squares[i];
+            
+            // Ignoramos los que están muriendo o esperando pacientemente
+            if (sq.phase === 'fading' || sq.phase === 'waiting') continue; 
+            
+            let hitSize = sq.size * 1.5; 
+            if (Math.abs(tx - sq.x) < hitSize && Math.abs(ty - sq.y) < hitSize) {
+                
+                if (sq.phase === 'initial') {
+                    // Ya dio a luz, pasa a modo espera. Ya no titila ni es interactuable.
+                    sq.phase = 'waiting'; 
+                    
+                    let angle = Math.random() * Math.PI * 2;
+                    let dist = 80 + Math.random() * 40; 
+                    
+                    squares.push({
+                        id: nextId++,
+                        parent: sq, // Guardamos la referencia a su creador (padre)
+                        x: sq.x,
+                        y: sq.y,
+                        targetX: sq.x + Math.cos(angle) * dist,
+                        targetY: Math.max(50, Math.min(mainCanvas.height - 50, sq.y + Math.sin(angle) * dist)),
+                        size: 20,
+                        targetSize: 20,
+                        alpha: 1,
+                        phase: 'baby',
+                        clicks: 0
+                    });
+
+                    // LA MAGIA: Si este cuadrado que acaba de ser padre TENÍA un padre (abuelo),
+                    // le avisamos al abuelo que es su momento de disolverse.
+                    if (sq.parent && sq.parent.phase === 'waiting') {
+                        sq.parent.phase = 'fading';
+                    }
+
+                } else if (sq.phase === 'baby') {
+                    sq.clicks++;
+                    if (sq.clicks === 1) sq.targetSize = 35;
+                    if (sq.clicks === 2) sq.targetSize = 50;
+                    if (sq.clicks === 3) {
+                        sq.targetSize = 70;
+                        sq.phase = 'initial'; // Se hace adulto, en el próximo click dará a luz
+                    }
+                }
+                break;
+            }
         }
     }
 
-    mainCanvas.onmousedown = handleInteraction;
-    mainCanvas.ontouchstart = (e) => { e.preventDefault(); handleInteraction(e); };
+    mainCanvas.onmousedown = handleTap;
+    mainCanvas.ontouchstart = (e) => { e.preventDefault(); handleTap(e); };
 
-    function animate(){
+    function animate() {
         animation = requestAnimationFrame(animate);
-        mainCtx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        time += 0.1;
 
-        if (!hasTouched) {
-            // Aumentamos la velocidad de 0.05 a 0.18
-            pulse += 0.18;
-            // Aumentamos el tamaño de la expansión de 0.15 a 0.35
-            square.scale = 1 + Math.sin(pulse) * 0.35;
+        for (let i = squares.length - 1; i >= 0; i--) {
+            let sq = squares[i];
+            
+            sq.x += (sq.targetX - sq.x) * 0.12;
+            sq.y += (sq.targetY - sq.y) * 0.12;
+            sq.size += (sq.targetSize - sq.size) * 0.15;
+
+            let drawSize = sq.size;
+
+            // Animación de respiración SOLO para interactuables activos
+            if (sq.phase === 'initial' || sq.phase === 'baby') {
+                drawSize *= (1 + Math.sin(time) * 0.08); 
+            }
+
+            if (sq.phase === 'fading') {
+                sq.alpha -= 0.015; // Se disuelve lentamente
+            }
+
+            if (sq.alpha > 0) {
+                drawGradientSquare(mainCtx, sq.x, sq.y, drawSize, Math.max(0, sq.alpha));
+            } else {
+                squares.splice(i, 1);
+            }
         }
-
-        minis.forEach(m => {
-            m.x += m.vx;
-            m.y += m.vy;
-
-            if (m.x - m.size/2 < 0 || m.x + m.size/2 > mainCanvas.width) m.vx *= -1;
-            if (m.y - m.size/2 < 0 || m.y + m.size/2 > mainCanvas.height) m.vy *= -1;
-
-            drawGradientSquare(mainCtx, m.x, m.y, m.size, m.alpha);
-            m.alpha -= 0.005; 
-        });
-        
-        minis = minis.filter(m => m.alpha > 0);
-
-        let currentSize = square.size * square.scale;
-        drawGradientSquare(mainCtx, square.x, square.y, currentSize, 1);
     }
     animate();
 }
