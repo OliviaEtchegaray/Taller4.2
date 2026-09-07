@@ -4,11 +4,10 @@
 function startCirculo1() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
-    // Usamos el tamaño menor de la pantalla para que nada se salga
     let minDim = Math.min(mainCanvas.width, mainCanvas.height); 
     
-    // Distancias dinámicas adaptables a celular y PC
-    let offsetX = minDim * 0.28; 
+    // CORRECCIÓN: Separación horizontal basada en el ancho (ideal para horizontal)
+    let offsetX = mainCanvas.width * 0.35; 
     let contRadius = minDim * 0.15;
     let orbRadius = minDim * 0.04;
     let orbOffsetY = minDim * 0.25;
@@ -130,7 +129,7 @@ function startCirculo1() {
     mainCanvas.ontouchcancel = (e) => { e.preventDefault(); onTouchEnd(e); };
 
     function animate() {
-        animation = requestAnimationFrame(animate);
+        let animation = requestAnimationFrame(animate);
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
 
         containers.forEach(c => {
@@ -161,10 +160,9 @@ function startCirculo1() {
                 o.x += (o.targetC.x - o.x) * 0.15;
                 o.y += (o.targetC.y - o.y) * 0.15;
                 o.radius += (o.targetC.radius - o.radius) * 0.1; 
-                // Revisar si terminó de acomodarse
                 if (Math.hypot(o.x - o.targetC.x, o.y - o.targetC.y) > 5) allDone = false;
             } else {
-                allDone = false; // Está idle o dragging
+                allDone = false;
             }
             
             if (o.color.name === 'dark_violet') {
@@ -181,18 +179,19 @@ function startCirculo1() {
             }
         });
 
-        // REINICIO INMEDIATO SI TODOS FUERON ACEPTADOS
         if (allDone && !isResetting) {
             isResetting = true;
             setTimeout(() => {
                 cancelAnimationFrame(animation);
                 startCirculo1();
-            }, 600); // 0.6 segundos
+            }, 600);
         }
     }
     
     animate();
-}// ==========================================
+}
+
+// ==========================================
 // CÍRCULO 2: LANZAMIENTO Y DESLIZAMIENTO
 // ==========================================
 function startCirculo2() {
@@ -200,10 +199,11 @@ function startCirculo2() {
     let cy = mainCanvas.height / 2;
     let minDim = Math.min(mainCanvas.width, mainCanvas.height);
     
-    // Todo relativo para celular!
-    let offsetX = minDim * 0.28; 
-    let baseRBig = minDim * 0.18;
-    let baseRSmall = minDim * 0.08;
+    // CORRECCIÓN: Separación real en landscape
+    let offsetX = mainCanvas.width * 0.35; 
+    let baseRBig = minDim * 0.22; // Inicia más grande
+    let baseRSmall = minDim * 0.08; // Inicia pequeño
+    let finalRadius = minDim * 0.15; // Tamaño final al que llegarán ambos
     
     let bigC = { x: cx - offsetX, y: cy, radius: baseRBig, baseRadius: baseRBig };
     let smallC = { x: cx + offsetX, y: cy, radius: baseRSmall, baseRadius: baseRSmall, isPressed: false, touchId: null, acceptedCount: 0 };
@@ -315,16 +315,15 @@ function startCirculo2() {
     mainCanvas.ontouchcancel = (e) => { e.preventDefault(); onTouchEnd(e); };
     
     function animate() {
-        animation = requestAnimationFrame(animate);
+        let animation = requestAnimationFrame(animate);
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
         pulseTime += 0.1;
 
-        // TAMAÑOS: El chico roba el tamaño del grande exactamente al llegar a 3
-        let diff = bigC.baseRadius - smallC.baseRadius;
-        let prog = Math.min(smallC.acceptedCount, 3) / 3; // 0, 0.33, 0.66, 1
+        // TAMAÑOS: Progresivo para que terminen del MISMO TAMAÑO
+        let prog = Math.min(smallC.acceptedCount, 3) / 3; 
         
-        let targetRadioGrande = bigC.baseRadius - (diff * prog); 
-        let targetRadioChico = smallC.baseRadius + (diff * prog);
+        let targetRadioGrande = bigC.baseRadius - ((bigC.baseRadius - finalRadius) * prog); 
+        let targetRadioChico = smallC.baseRadius + ((finalRadius - smallC.baseRadius) * prog);
 
         bigC.radius += (targetRadioGrande - bigC.radius) * 0.1;
         smallC.radius += (targetRadioChico - smallC.radius) * 0.1;
@@ -353,20 +352,25 @@ function startCirculo2() {
         }
         mainCtx.stroke();
 
-        // REINICIO
+        // REINICIO (Cuando 3 esferas hayan pasado)
         if (smallC.acceptedCount >= 3 && !isResetting) {
             isResetting = true;
             setTimeout(() => {
                 cancelAnimationFrame(animation);
                 startCirculo2();
-            }, 2000); // 2 segundos
+            }, 2000);
         }
+
+        // Reorganizar dinámicamente las bolas que quedan "idle" en el círculo grande
+        let idleOrbs = orbs.filter(o => o.state === 'idle' || o.state === 'returning');
 
         orbs.forEach((o, index) => {
             if (o.state === 'idle') {
+                // Buscamos su índice relativo entre las que quedan para que no queden huecos
+                let localIndex = idleOrbs.indexOf(o);
                 let targetX = bigC.x + bigC.radius - o.radius - 10;
-                let spacing = (bigC.radius * 2) / 7;
-                let targetY = (bigC.y - bigC.radius + spacing) + (index * spacing);
+                let spacing = (bigC.radius * 2) / (idleOrbs.length + 1);
+                let targetY = (bigC.y - bigC.radius + spacing) + (localIndex * spacing);
 
                 o.x += (targetX - o.x) * 0.05;
                 o.y += (targetY - o.y) * 0.05;
@@ -409,7 +413,8 @@ function startCirculo2() {
         });
     }
     animate();
-} 
+}
+
 // ==========================================
 // CÍRCULO 3: UNIÓN Y SATURACIÓN AL VIOLETA OSCURO
 // ==========================================
@@ -418,16 +423,29 @@ function startCirculo3() {
     let cy = mainCanvas.height / 2;
     let minDim = Math.min(mainCanvas.width, mainCanvas.height);
     
-    // Radios y posiciones adaptados a celular
+    // CORRECCIÓN: Separación HORIZONTAL para uso en paisaje
     let baseRadius = minDim * 0.08;
-    let offsetY = minDim * 0.25;
+    let offsetX = mainCanvas.width * 0.25; 
 
-    let c1 = { x: cx, y: cy - offsetY, radius: baseRadius };
-    let c2 = { x: cx, y: cy + offsetY, radius: baseRadius };
+    // Ahora empiezan separados a los lados (x - offsetX y x + offsetX)
+    let c1 = { x: cx - offsetX, y: cy, radius: baseRadius };
+    let c2 = { x: cx + offsetX, y: cy, radius: baseRadius };
 
-    let baseColor = { r: 130, g: 130, b: 130 };
-    let targetColor = { r: 75, g: 25, b: 130 }; 
+    let baseColor = { r: 130, g: 130, b: 130 }; // Gris
+    let targetColor = { r: 75, g: 25, b: 130 }; // Violeta oscuro
     let currentColor = { r: 130, g: 130, b: 130 };
+
+    // Función de degradado local integrada por si las globales fallan
+    function renderCustomGradient(ctx, x, y, radius, r, g, b) {
+        let gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, `rgba(255, 255, 255, 1)`); 
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 1)`);  
+
+        ctx.beginPath();
+        ctx.fillStyle = gradient;
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     function handleMultiTouch(e) {
         if (e.touches.length >= 2) {
@@ -442,17 +460,16 @@ function startCirculo3() {
 
             let distance = Math.hypot(x1 - x2, y1 - y2);
             
-            // Distancia máxima dinámica según la pantalla
-            let maxDist = minDim * 0.8;
+            let maxDist = mainCanvas.width * 0.8;
             let factor = Math.max(0, Math.min(1, 1 - (distance / maxDist)));
 
+            // Modificamos el color hacia el Violeta Oscuro
             currentColor.r = baseColor.r + (targetColor.r - baseColor.r) * factor;
             currentColor.g = baseColor.g + (targetColor.g - baseColor.g) * factor;
             currentColor.b = baseColor.b + (targetColor.b - baseColor.b) * factor;
 
             let growthFactor = Math.pow(factor, 3); 
             
-            // Crecen brutalmente según la pantalla
             c1.radius = baseRadius + (growthFactor * (minDim * 0.45)); 
             c2.radius = c1.radius;
 
@@ -460,8 +477,8 @@ function startCirculo3() {
             currentColor = { ...baseColor };
             c1.radius = baseRadius;
             c2.radius = baseRadius;
-            c1.x = cx; c1.y = cy - offsetY;
-            c2.x = cx; c2.y = cy + offsetY;
+            c1.x = cx - offsetX; c1.y = cy;
+            c2.x = cx + offsetX; c2.y = cy;
         }
     }
 
@@ -471,16 +488,15 @@ function startCirculo3() {
     mainCanvas.ontouchcancel = (e) => { e.preventDefault(); handleMultiTouch(e); };
 
     function animate() {
-        animation = requestAnimationFrame(animate);
+        let animation = requestAnimationFrame(animate);
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
 
-        // AQUÍ ESTÁ EL FIX DEL COLOR: Math.round redondea a números enteros (sin decimales)
         let r = Math.round(currentColor.r);
         let g = Math.round(currentColor.g);
         let b = Math.round(currentColor.b);
 
-        drawGradientCircle(mainCtx, c1.x, c1.y, c1.radius, r, g, b, 1);
-        drawGradientCircle(mainCtx, c2.x, c2.y, c2.radius, r, g, b, 1);
+        renderCustomGradient(mainCtx, c1.x, c1.y, c1.radius, r, g, b);
+        renderCustomGradient(mainCtx, c2.x, c2.y, c2.radius, r, g, b);
     }
     animate();
 }
