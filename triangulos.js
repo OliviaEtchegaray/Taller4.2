@@ -10,11 +10,11 @@ function startTriangulo1() {
     const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
     let currentBg = -1;
 
-    // Posiciones lado a lado e independencia (diferentes multiplicadores de reacción)
+    // Aumentamos la separación (offsetX) para vista horizontal
     let triangles = [
-        { offsetX: -80, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.5 },
+        { offsetX: -250, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.5 },
         { offsetX: 0, offsetY: 0, opacity: 0.2, flashed: false, rate: 0.8 },
-        { offsetX: 80, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.2 }
+        { offsetX: 250, offsetY: 0, opacity: 0.2, flashed: false, rate: 1.2 }
     ];
 
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -24,7 +24,7 @@ function startTriangulo1() {
     function triggerFlash(t) {
         t.flashed = true;
         t.opacity = 1;
-        currentBg = (currentBg + 1) % bgColors.length; // Cambio de fondo global
+        currentBg = (currentBg + 1) % bgColors.length;
         
         setTimeout(() => {
             t.opacity = 0.2;
@@ -36,7 +36,6 @@ function startTriangulo1() {
         let acc = event.accelerationIncludingGravity || event.acceleration;
         if (!acc) return;
         
-        // Efecto visual: capturamos la aceleración cruda para hacer que tiemblen
         shakeX = -(acc.x || 0) * 3; 
         shakeY = (acc.y || 0) * 3;
         
@@ -44,7 +43,7 @@ function startTriangulo1() {
         if (force > 15) { 
             triangles.forEach(t => {
                 if (!t.flashed) {
-                    t.opacity += 0.15 * t.rate; // Reacción independiente
+                    t.opacity += 0.15 * t.rate;
                     if (t.opacity >= 1) triggerFlash(t);
                 }
             });
@@ -52,7 +51,6 @@ function startTriangulo1() {
     }
 
     function handleManualSwipe() {
-        // Fallback visual para mouse/touch
         shakeX = (Math.random() - 0.5) * 10;
         shakeY = (Math.random() - 0.5) * 10;
         
@@ -77,11 +75,9 @@ function startTriangulo1() {
     function animate() {
         animation = requestAnimationFrame(animate);
         
-        // Suavizado del temblor (vuelve al centro si dejas de moverlo)
         shakeX *= 0.85;
         shakeY *= 0.85;
         
-        // Dibujado del fondo
         if(currentBg !== -1) {
             drawRadialBackground(mainCtx, mainCanvas, bgColors[currentBg]);
         } else {
@@ -89,35 +85,31 @@ function startTriangulo1() {
             mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
         }
         
-        // Dibujar los 3 triángulos verdes independientes
         triangles.forEach(t => {
             if(t.opacity > 0.2 && !t.flashed) t.opacity -= 0.005;
             
-            // Sumamos el shakeX y shakeY a la posición de dibujo
             let drawX = cx + t.offsetX + shakeX;
             let drawY = cy + t.offsetY + shakeY;
             
-            drawGradientTriangle(mainCtx, drawX, drawY, 50, 50, 205, 50, t.opacity);
+            // Tamaño unificado a 100
+            drawGradientTriangle(mainCtx, drawX, drawY, 100, 50, 205, 50, t.opacity);
         });
     }
     animate();
 }
-
-// 2
 function startTriangulo2() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
     let sensitivity = 1.5; 
     
-    // Lógica de fondos
     const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
     let currentBg = -1;
 
-    // Posiciones lado a lado e independencia rítmica
+    // Aumentamos la separación en las posiciones x y baseX
     let triangles = [
-        { x: cx - 80, y: cy, baseX: cx - 80, baseY: cy, mult: 1.4, fadeOut: 0, resetting: false },
+        { x: cx - 250, y: cy, baseX: cx - 250, baseY: cy, mult: 1.4, fadeOut: 0, resetting: false },
         { x: cx, y: cy, baseX: cx, baseY: cy, mult: 0.7, fadeOut: 0, resetting: false },
-        { x: cx + 80, y: cy, baseX: cx + 80, baseY: cy, mult: 1.1, fadeOut: 0, resetting: false }
+        { x: cx + 250, y: cy, baseX: cx + 250, baseY: cy, mult: 1.1, fadeOut: 0, resetting: false }
     ];
 
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -130,7 +122,6 @@ function startTriangulo2() {
         if (!event.beta || !event.gamma) return;
         triangles.forEach(t => {
             if (t.resetting) return;
-            // Movimiento afectado por el multiplicador individual
             t.x += event.gamma * sensitivity * 0.4 * t.mult;
             t.y += event.beta * sensitivity * 0.4 * t.mult;
             checkFail(t);
@@ -155,7 +146,7 @@ function startTriangulo2() {
     function checkFail(t) {
         if (Math.hypot(t.x - t.baseX, t.y - t.baseY) > mainCanvas.height * 0.35) {
             t.resetting = true;
-            currentBg = (currentBg + 1) % bgColors.length; // Flash/Fondo cuando uno pierde el control
+            currentBg = (currentBg + 1) % bgColors.length; 
         }
     }
 
@@ -198,14 +189,13 @@ function startTriangulo2() {
                 t.y += (t.baseY - t.y) * 0.01;
             }
 
-            // Mismo verde y tamaño
-            drawGradientTriangle(mainCtx, t.x, t.y, 50, 50, 205, 50, currentOpacity);
+            // Tamaño unificado a 100
+            drawGradientTriangle(mainCtx, t.x, t.y, 100, 50, 205, 50, currentOpacity);
         });
     }
     animate();
 }
 
-// 3
 function startTriangulo3() {
     let gravityX = 0;
     let gravityY = 0;
@@ -213,7 +203,6 @@ function startTriangulo3() {
     let gameOverTimeout = null;
     let difficultyMultiplier = 1; 
 
-    // Lógica de fondos
     const bgColors = ["rgba(200, 162, 200, 1)", "rgba(255, 235, 150, 1)", "rgba(255, 200, 150, 1)"]; 
     let currentBg = -1;
 
@@ -221,18 +210,20 @@ function startTriangulo3() {
         difficultyMultiplier += 0.3;
     }, 5000);
 
+    // Separados ampliamente a lo largo de la pantalla horizontal (20%, 80%, 50%).
+    // Tamaño subido a 100.
     let targets = [
-        { x: mainCanvas.width * 0.3, y: mainCanvas.height * 0.3, size: 50, matched: false, glow: 0 },
-        { x: mainCanvas.width * 0.7, y: mainCanvas.height * 0.4, size: 50, matched: false, glow: 0 },
-        { x: mainCanvas.width * 0.5, y: mainCanvas.height * 0.7, size: 50, matched: false, glow: 0 }
+        { x: mainCanvas.width * 0.2, y: mainCanvas.height * 0.35, size: 100, matched: false, glow: 0 },
+        { x: mainCanvas.width * 0.8, y: mainCanvas.height * 0.45, size: 100, matched: false, glow: 0 },
+        { x: mainCanvas.width * 0.5, y: mainCanvas.height * 0.70, size: 100, matched: false, glow: 0 }
     ];
 
     let pieces = targets.map((t, index) => ({
-        x: Math.random() * (mainCanvas.width - 100) + 50,
-        y: Math.random() * (mainCanvas.height - 100) + 50,
+        x: Math.random() * (mainCanvas.width - 200) + 100,
+        y: Math.random() * (mainCanvas.height - 200) + 100,
         vx: 0,
         vy: 0,
-        size: 50, 
+        size: 100, // Tamaño subido a 100
         targetIndex: index
     }));
 
@@ -272,21 +263,21 @@ function startTriangulo3() {
             gravityX = 0; gravityY = 0;
         }
 
-        // 1. Dibujar Huecos (SOLO CONTORNOS VERDES)
+        // 1. Dibujar Huecos (CONTORNOS VERDES AJUSTADOS)
         targets.forEach(t => {
             if (t.glow > 0) t.glow -= 0.02;
 
             mainCtx.beginPath();
-            // Matemáticas estándar para dibujar un triángulo equilátero hacia arriba
-            mainCtx.moveTo(t.x, t.y - t.size);
-            mainCtx.lineTo(t.x + t.size * 0.866, t.y + t.size * 0.5);
-            mainCtx.lineTo(t.x - t.size * 0.866, t.y + t.size * 0.5);
+            // Ahora el ancho y el alto del triángulo vacío miden exactamente 't.size' (100x100)
+            // para que coincida milimétricamente con la pieza que se rellena.
+            mainCtx.moveTo(t.x, t.y - t.size / 2);
+            mainCtx.lineTo(t.x + t.size / 2, t.y + t.size / 2);
+            mainCtx.lineTo(t.x - t.size / 2, t.y + t.size / 2);
             mainCtx.closePath();
 
-            // Configuramos la línea
-            mainCtx.lineWidth = 4;
-            // Si no está emparejado, es un contorno verde sólido. 
-            // Si está emparejado (matched), se difumina con el valor "glow".
+            // BORDE FINO (2px)
+            mainCtx.lineWidth = 2;
+            
             let alpha = t.matched ? t.glow : 0.8;
             mainCtx.strokeStyle = `rgba(50, 205, 50, ${alpha})`;
             mainCtx.stroke();
@@ -312,20 +303,18 @@ function startTriangulo3() {
                 p.y = Math.max(0, Math.min(mainCanvas.height, p.y));
 
                 let dist = Math.hypot(p.x - t.x, p.y - t.y);
-                if (dist < 15) { 
+                if (dist < 25) { 
                     t.matched = true;
                     t.glow = 1.0; 
                     p.x = t.x; 
                     p.y = t.y;
-                    currentBg = (currentBg + 1) % bgColors.length; // Flash de fondo
+                    currentBg = (currentBg + 1) % bgColors.length;
                 }
             }
 
             if (!t.matched) {
-                // Pieza suelta a encajar
                 drawGradientTriangle(mainCtx, p.x, p.y, p.size, 50, 205, 50, 1);
             } else {
-                // Cuando encajan, dibuja el relleno estático en el hueco
                 drawGradientTriangle(mainCtx, t.x, t.y, t.size, 50, 205, 50, 1);
                 successCount++;
             }
