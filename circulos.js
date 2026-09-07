@@ -14,15 +14,17 @@ function startCirculo1() {
     let shuffledColors = Math.random() > 0.5 ? [colors[0], colors[1]] : [colors[1], colors[0]];
 
     // Contenedores
+// Contenedores (Aumentamos la separación horizontal cambiando 90 por 150)
+// Contenedores mucho más hacia los bordes
     let containers = [
-        { x: cx - 90, y: cy - 20, radius: 85, color: shuffledColors[0], isPressed: false, touchId: null },
-        { x: cx + 90, y: cy - 60, radius: 85, color: shuffledColors[1], isPressed: false, touchId: null }
+        { x: cx - 250, y: cy - 20, radius: 85, color: shuffledColors[0], isPressed: false, touchId: null },
+        { x: cx + 250, y: cy - 60, radius: 85, color: shuffledColors[1], isPressed: false, touchId: null }
     ];
 
-    // Bolitas
+    // Bolitas también más alejadas del centro
     let orbs = [
-        { id: 1, startX: cx - 40, startY: cy + 120, x: cx - 40, y: cy + 120, radius: 22, color: colors[1], isDragging: false, touchId: null, state: 'idle' },
-        { id: 2, startX: cx + 40, startY: cy + 120, x: cx + 40, y: cy + 120, radius: 22, color: colors[0], isDragging: false, touchId: null, state: 'idle' }
+        { id: 1, startX: cx - 150, startY: cy + 120, x: cx - 150, y: cy + 120, radius: 22, color: colors[1], isDragging: false, touchId: null, state: 'idle' },
+        { id: 2, startX: cx + 150, startY: cy + 120, x: cx + 150, y: cy + 120, radius: 22, color: colors[0], isDragging: false, touchId: null, state: 'idle' }
     ];
 
     function getCanvasPos(touch) {
@@ -193,8 +195,10 @@ function startCirculo2() {
     let cy = mainCanvas.height / 2;
     
     // Contenedores con un radio base para calcular el crecimiento
-    let bigC = { x: cx - 60, y: cy, radius: 70, baseRadius: 70 };
-    let smallC = { x: cx + 80, y: cy, radius: 45, baseRadius: 45, isPressed: false, touchId: null, acceptedCount: 0 };
+// Contenedores mucho más separados hacia los bordes
+    // Cambiamos el -60 y el +80 por -250 y +250
+    let bigC = { x: cx - 250, y: cy, radius: 70, baseRadius: 70 };
+    let smallC = { x: cx + 250, y: cy, radius: 45, baseRadius: 45, isPressed: false, touchId: null, acceptedCount: 0 };
     let pulseTime = 0;
     let isResetting = false;
 
@@ -425,9 +429,8 @@ function startCirculo2() {
         });
     }
     animate();
-}
-// ==========================================
-// CÍRCULO 3: UNIÓN Y SATURACIÓN
+}// ==========================================
+// CÍRCULO 3: UNIÓN Y SATURACIÓN AL VIOLETA OSCURO
 // ==========================================
 function startCirculo3() {
     let cx = mainCanvas.width / 2;
@@ -436,9 +439,9 @@ function startCirculo3() {
     let c1 = { x: cx, y: cy - 80, radius: 35 };
     let c2 = { x: cx, y: cy + 80, radius: 35 };
 
-    // Valores iniciales (bien grises/desaturados) y objetivo (violeta saturado)
+    // Valores iniciales (grises) y nuevo objetivo (VIOLETA OSCURO: 75, 25, 130)
     let baseColor = { r: 130, g: 130, b: 130 };
-    let targetColor = { r: 200, g: 162, b: 255 }; 
+    let targetColor = { r: 75, g: 25, b: 130 }; // <--- Cambiado al violeta oscuro
     let currentColor = { r: 130, g: 130, b: 130 };
 
     function handleMultiTouch(e) {
@@ -455,19 +458,20 @@ function startCirculo3() {
             // Distancia entre los dos dedos
             let distance = Math.hypot(x1 - x2, y1 - y2);
             
-            // Incrementamos la distancia de detección a 400 para que empiece a saturar antes
+            // Detección
             let factor = Math.max(0, Math.min(1, 1 - (distance / 400)));
 
-            // Color se satura de manera lineal
+            // El color se transforma gradualmente hacia el violeta oscuro
             currentColor.r = baseColor.r + (targetColor.r - baseColor.r) * factor;
             currentColor.g = baseColor.g + (targetColor.g - baseColor.g) * factor;
             currentColor.b = baseColor.b + (targetColor.b - baseColor.b) * factor;
 
-            // Exageración del tamaño: Usamos Math.pow para que el crecimiento sea explosivo al final
+            // Exageración del tamaño: Crecimiento explosivo al final
             let growthFactor = Math.pow(factor, 3); 
             
-            // Crecen brutalmente de 35px hasta 150px de radio
-            c1.radius = 35 + (growthFactor * 115);
+            // AUMENTAMOS EL TAMAÑO: ahora sumará hasta 250px extra (antes 115)
+            // Esto hace que al juntarlos cubran mucha más pantalla
+            c1.radius = 35 + (growthFactor * 250); 
             c2.radius = c1.radius;
 
         } else {
@@ -488,6 +492,7 @@ function startCirculo3() {
         animation = requestAnimationFrame(animate);
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
 
+        // Usamos el normal porque currentColor hace el trabajo de transición suave al oscuro
         drawGradientCircle(mainCtx, c1.x, c1.y, c1.radius, currentColor.r, currentColor.g, currentColor.b, 1);
         drawGradientCircle(mainCtx, c2.x, c2.y, c2.radius, currentColor.r, currentColor.g, currentColor.b, 1);
     }
