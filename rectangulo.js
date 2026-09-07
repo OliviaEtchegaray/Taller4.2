@@ -92,24 +92,27 @@ function startBlue1(){
 
     animate();
 }
-// 2
-function startBlue2(){
+// ==========================================
+// BLUE 2: RECTÁNGULOS MULTIPLICÁNDOSE (ADAPTADO A HORIZONTAL)
+// ==========================================
+function startBlue2() {
     let time = 0;
     let squares = [];
     let nextId = 1;
     
-    // Generamos el cuadrado "Abuelo" / inicial
+    let baseSize = Math.min(mainCanvas.width, mainCanvas.height) * 0.15; // Tamaño dinámico
+
     squares.push({
         id: 0,
-        parent: null, // No tiene padre
+        parent: null,
         x: mainCanvas.width / 2,
         y: mainCanvas.height / 2,
         targetX: mainCanvas.width / 2,
         targetY: mainCanvas.height / 2,
-        size: 70,
-        targetSize: 70,
+        size: baseSize,
+        targetSize: baseSize,
         alpha: 1,
-        phase: 'initial', // Fases: 'initial', 'baby', 'waiting', 'fading'
+        phase: 'initial', 
         clicks: 0
     });
 
@@ -123,46 +126,53 @@ function startBlue2(){
         for (let i = squares.length - 1; i >= 0; i--) {
             let sq = squares[i];
             
-            // Ignoramos los que están muriendo o esperando pacientemente
             if (sq.phase === 'fading' || sq.phase === 'waiting') continue; 
             
             let hitSize = sq.size * 1.5; 
             if (Math.abs(tx - sq.x) < hitSize && Math.abs(ty - sq.y) < hitSize) {
                 
                 if (sq.phase === 'initial') {
-                    // Ya dio a luz, pasa a modo espera. Ya no titila ni es interactuable.
                     sq.phase = 'waiting'; 
-                    
                     let angle = Math.random() * Math.PI * 2;
-                    let dist = 80 + Math.random() * 40; 
                     
+                    // CAMBIO AQUÍ: Distancia muy amplia basada en el ancho de la pantalla
+                    let dist = (mainCanvas.width * 0.25) + (Math.random() * (mainCanvas.width * 0.15)); 
+
+                    let newX = sq.x + Math.cos(angle) * dist;
+                    let newY = sq.y + Math.sin(angle) * dist;
+
+                    // CAMBIO AQUÍ: Margen más grande para evitar recortes en bordes
+                    let margin = baseSize; 
+
+                    let boundedX = Math.max(margin, Math.min(mainCanvas.width - margin, newX));
+                    let boundedY = Math.max(margin, Math.min(mainCanvas.height - margin, newY));
+
                     squares.push({
                         id: nextId++,
-                        parent: sq, // Guardamos la referencia a su creador (padre)
+                        parent: sq,
                         x: sq.x,
                         y: sq.y,
-                        targetX: sq.x + Math.cos(angle) * dist,
-                        targetY: Math.max(50, Math.min(mainCanvas.height - 50, sq.y + Math.sin(angle) * dist)),
-                        size: 20,
-                        targetSize: 20,
+                        targetX: boundedX,
+                        targetY: boundedY,
+                        size: baseSize * 0.3, // Nace chiquito
+                        targetSize: baseSize * 0.3,
                         alpha: 1,
                         phase: 'baby',
                         clicks: 0
                     });
 
-                    // LA MAGIA: Si este cuadrado que acaba de ser padre TENÍA un padre (abuelo),
-                    // le avisamos al abuelo que es su momento de disolverse.
                     if (sq.parent && sq.parent.phase === 'waiting') {
                         sq.parent.phase = 'fading';
                     }
 
                 } else if (sq.phase === 'baby') {
                     sq.clicks++;
-                    if (sq.clicks === 1) sq.targetSize = 35;
-                    if (sq.clicks === 2) sq.targetSize = 50;
+                    // Crecen de a poco hasta el tamaño adulto
+                    if (sq.clicks === 1) sq.targetSize = baseSize * 0.5;
+                    if (sq.clicks === 2) sq.targetSize = baseSize * 0.75;
                     if (sq.clicks === 3) {
-                        sq.targetSize = 70;
-                        sq.phase = 'initial'; // Se hace adulto, en el próximo click dará a luz
+                        sq.targetSize = baseSize;
+                        sq.phase = 'initial'; 
                     }
                 }
                 break;
@@ -174,7 +184,7 @@ function startBlue2(){
     mainCanvas.ontouchstart = (e) => { e.preventDefault(); handleTap(e); };
 
     function animate() {
-        animation = requestAnimationFrame(animate);
+        let animation = requestAnimationFrame(animate);
         mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
         time += 0.1;
 
@@ -187,17 +197,19 @@ function startBlue2(){
 
             let drawSize = sq.size;
 
-            // Animación de respiración SOLO para interactuables activos
             if (sq.phase === 'initial' || sq.phase === 'baby') {
                 drawSize *= (1 + Math.sin(time) * 0.08); 
             }
 
             if (sq.phase === 'fading') {
-                sq.alpha -= 0.015; // Se disuelve lentamente
+                sq.alpha -= 0.015; 
             }
 
             if (sq.alpha > 0) {
-                drawGradientSquare(mainCtx, sq.x, sq.y, drawSize, Math.max(0, sq.alpha));
+                // Asegúrate de tener definida tu función drawGradientSquare en tu proyecto principal
+                if (typeof drawGradientSquare === 'function') {
+                    drawGradientSquare(mainCtx, sq.x, sq.y, drawSize, Math.max(0, sq.alpha));
+                }
             } else {
                 squares.splice(i, 1);
             }
