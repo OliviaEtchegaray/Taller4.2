@@ -414,28 +414,25 @@ function startCirculo2() {
     }
     animate();
 }
-
 // ==========================================
-// CÍRCULO 3: UNIÓN Y SATURACIÓN AL VIOLETA OSCURO
+// CÍRCULO 3: UNIÓN Y SATURACIÓN (VIOLETA CLARO A OSCURO)
 // ==========================================
 function startCirculo3() {
     let cx = mainCanvas.width / 2;
     let cy = mainCanvas.height / 2;
     let minDim = Math.min(mainCanvas.width, mainCanvas.height);
     
-    // CORRECCIÓN: Separación HORIZONTAL para uso en paisaje
     let baseRadius = minDim * 0.08;
     let offsetX = mainCanvas.width * 0.25; 
 
-    // Ahora empiezan separados a los lados (x - offsetX y x + offsetX)
     let c1 = { x: cx - offsetX, y: cy, radius: baseRadius };
     let c2 = { x: cx + offsetX, y: cy, radius: baseRadius };
 
-    let baseColor = { r: 130, g: 130, b: 130 }; // Gris
+    // CAMBIO AQUÍ: Ahora arranca en Violeta Claro
+    let baseColor = { r: 200, g: 162, b: 255 }; // Violeta claro
     let targetColor = { r: 75, g: 25, b: 130 }; // Violeta oscuro
-    let currentColor = { r: 130, g: 130, b: 130 };
+    let currentColor = { r: 200, g: 162, b: 255 }; // Empieza en claro
 
-    // Función de degradado local integrada por si las globales fallan
     function renderCustomGradient(ctx, x, y, radius, r, g, b) {
         let gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
         gradient.addColorStop(0, `rgba(255, 255, 255, 1)`); 
@@ -463,7 +460,6 @@ function startCirculo3() {
             let maxDist = mainCanvas.width * 0.8;
             let factor = Math.max(0, Math.min(1, 1 - (distance / maxDist)));
 
-            // Modificamos el color hacia el Violeta Oscuro
             currentColor.r = baseColor.r + (targetColor.r - baseColor.r) * factor;
             currentColor.g = baseColor.g + (targetColor.g - baseColor.g) * factor;
             currentColor.b = baseColor.b + (targetColor.b - baseColor.b) * factor;
